@@ -3,8 +3,8 @@ CFLAGS                    = -D__STDC_CONSTANT_MACROS -D_FILE_OFFSET_BITS=64 -D_L
 CDFLAGS                   = -D__STDC_CONSTANT_MACROS -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE=1 -DDEBUG=1 -g -O0 -fno-inline
 INCLUDES                 := -iquote${PWD}
 OBJDIR                    = objects
-PROG                      = convert
-SOURCE                    = convert.c
+PROG                      = convert2bed
+SOURCE                    = convert2bed.c
 
 all: setup build
 
