@@ -7,23 +7,41 @@ main(int argc, char **argv)
     fprintf (stderr, "--- convert2bed main() - enter ---\n");
 #endif
 
+    c2b_pipeset pipes;
     pthread_t srcThread, destThread;
     pid_t cat;
-    c2b_pipeset pipes;
 
     c2b_init_globals();
     c2b_init_command_line_options(argc, argv);
     c2b_test_dependencies();
 
-    c2b_pipe4_cloexec(pipes.Ain);
-    c2b_pipe4_cloexec(pipes.Aout);
-    c2b_pipe4_cloexec(pipes.Aerr);
+    /* 
+       At most, we seem to need 4 pipes to handle the most complex pipeline: 
+       
+       BAM -> SAM -> BED (unsorted) -> BED (sorted) -> Starch
+       
+       Here, each arrow represents a bidirectional data pipe between
+       processing steps. If a more complex pipeline arises, we can  
+       just increase MAX_PIPES.
+    */
+
+    c2b_init_pipeset(&pipes, MAX_PIPES); 
+
+    /*
+       Depending on which input format, we can open pid_t instances
+       to handle data in a specified order. 
+    */
 
     cat = c2b_popen4("cat -",
-		     pipes.Ain,
-		     pipes.Aout,
-		     pipes.Aerr, 
+		     pipes.in[0],
+		     pipes.out[0],
+		     pipes.err[0], 
 		     POPEN4_FLAG_NONE);
+    
+    /*
+       Once we have the desired process instances, we create and join
+       threads for their ordered execution.
+    */
 
     pthread_create(&srcThread,
 		   NULL,
@@ -38,6 +56,9 @@ main(int argc, char **argv)
     pthread_join(srcThread, (void **) NULL);
     pthread_join(destThread, (void **) NULL);
 
+    /* clean-up */
+
+    c2b_delete_pipeset(&pipes);
     c2b_delete_globals();
 
 #ifdef DEBUG
@@ -46,15 +67,81 @@ main(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
+static void 
+c2b_init_pipeset(c2b_pipeset *p, const size_t num)
+{
+    int **ins = NULL;
+    int **outs = NULL;
+    int **errs = NULL;
+    size_t n;
+    
+    ins = malloc(num * sizeof(int *));
+    outs = malloc(num * sizeof(int *));
+    errs = malloc(num * sizeof(int *));
+    if ((!ins) || (!outs) || (!errs)) { 
+	fprintf(stderr, "Error: Could not allocate space to temporary pipe arrays\n");
+	exit(EXIT_FAILURE); 
+    }
+
+    p->in = ins;
+    p->out = outs;
+    p->err = errs;
+
+    for (n = 0; n < num; n++) {
+	p->in[n] = NULL;
+	p->in[n] = malloc(PIPE_STREAMS * sizeof(int));
+	if (!p->in[n]) { 
+	    fprintf(stderr, "Error: Could not allocate space to temporary internal pipe array\n");
+	    exit(EXIT_FAILURE); 
+	}
+	p->out[n] = NULL;
+	p->out[n] = malloc(PIPE_STREAMS * sizeof(int));
+	if (!p->out[n]) { 
+	    fprintf(stderr, "Error: Could not allocate space to temporary internal pipe array\n");
+	    exit(EXIT_FAILURE); 
+	}
+	p->err[n] = NULL;
+	p->err[n] = malloc(PIPE_STREAMS * sizeof(int));
+	if (!p->err[n]) { 
+	    fprintf(stderr, "Error: Could not allocate space to temporary internal pipe array\n");
+	    exit(EXIT_FAILURE); 
+	}
+
+	/* set close-on-exec flag for each pipe */
+	c2b_pipe4_cloexec(p->in[n]);
+	c2b_pipe4_cloexec(p->out[n]);
+	c2b_pipe4_cloexec(p->err[n]);
+    }
+
+    p->num = num;
+}
+
+static void
+c2b_delete_pipeset(c2b_pipeset *p)
+{
+    size_t n;
+
+    for (n = 0; n < p->num; n++) {
+	free(p->in[n]), p->in[n] = NULL;
+	free(p->out[n]), p->out[n] = NULL;
+	free(p->err[n]), p->err[n] = NULL;
+    }
+    free(p->in), p->in = NULL;
+    free(p->out), p->out = NULL;
+    free(p->err), p->err = NULL;
+
+    p->num = 0;
+}
+
 void * 
 c2b_srcThreadMain(void *arg)
 {
     c2b_pipeset *pipes = (c2b_pipeset *) arg;
     char c;
     while (read(STDIN_FILENO, &c, 1) > 0) {
-        write(pipes->Ain[PIPEWR], &c, 1);
+        write(pipes->in[0][PIPE_WRITE], &c, 1);
     }
-    close(pipes->Ain[PIPEWR]);
+    close(pipes->in[0][PIPE_WRITE]);
     pthread_exit(NULL);
 }
 
@@ -63,7 +150,7 @@ c2b_destThreadMain(void *arg)
 {
     c2b_pipeset *pipes = (c2b_pipeset *) arg;
     char c;
-    while(read(pipes->Aout[PIPERD], &c, 1) > 0) {
+    while(read(pipes->out[0][PIPE_READ], &c, 1) > 0) {
         write(STDOUT_FILENO, &c, 1);
     }
     pthread_exit(NULL);
@@ -86,10 +173,10 @@ c2b_pipe4(int fd[2], int flags)
 {
     int ret = pipe(fd);
     if (flags & PIPE4_FLAG_RD_CLOEXEC) { 
-	c2b_setCloseExecFlag(fd[PIPERD]); 
+	c2b_setCloseExecFlag(fd[PIPE_READ]); 
     }
     if (flags & PIPE4_FLAG_WR_CLOEXEC) { 
-	c2b_setCloseExecFlag(fd[PIPEWR]); 
+	c2b_setCloseExecFlag(fd[PIPE_WRITE]); 
     }
     return ret;
 }
@@ -109,20 +196,20 @@ c2b_popen4(const char* cmd, int pin[2], int pout[2], int perr[2], int flags)
         if (flags & POPEN4_FLAG_CLOSE_CHILD_STDIN) {
             close(0);
         } else {
-            c2b_unsetCloseExecFlag(pin[PIPERD]);
-            dup2(pin[PIPERD], 0);
+            c2b_unsetCloseExecFlag(pin[PIPE_READ]);
+            dup2(pin[PIPE_READ], 0);
         }
         if (flags & POPEN4_FLAG_CLOSE_CHILD_STDOUT) {
             close(1);
         } else {
-            c2b_unsetCloseExecFlag(pout[PIPEWR]);
-            dup2(pout[PIPEWR], 1);
+            c2b_unsetCloseExecFlag(pout[PIPE_WRITE]);
+            dup2(pout[PIPE_WRITE], 1);
         }
         if (flags & POPEN4_FLAG_CLOSE_CHILD_STDERR) {
             close(2);
         } else {
-            c2b_unsetCloseExecFlag(perr[PIPEWR]);
-            dup2(perr[PIPEWR], 2);
+            c2b_unsetCloseExecFlag(perr[PIPE_WRITE]);
+            dup2(perr[PIPE_WRITE], 2);
         }
         execl("/bin/sh", "sh", "-c", cmd, NULL);
         fprintf(stderr, "exec() failed!\n");
@@ -134,15 +221,15 @@ c2b_popen4(const char* cmd, int pin[2], int pout[2], int perr[2], int flags)
          */
         if (~flags & POPEN4_FLAG_NOCLOSE_PARENT_STDIN &&
 	    ~flags & POPEN4_FLAG_CLOSE_CHILD_STDIN) {
-            close(pin[PIPERD]);
+            close(pin[PIPE_READ]);
         }
         if (~flags & POPEN4_FLAG_NOCLOSE_PARENT_STDOUT &&
 	    ~flags & POPEN4_FLAG_CLOSE_CHILD_STDOUT) {
-            close(pout[PIPEWR]);
+            close(pout[PIPE_WRITE]);
         }
         if (~flags & POPEN4_FLAG_NOCLOSE_PARENT_STDERR &&
 	    ~flags & POPEN4_FLAG_CLOSE_CHILD_STDERR) {
-            close(perr[PIPEWR]);
+            close(perr[PIPE_WRITE]);
         }
         return ret;
     }
@@ -160,12 +247,6 @@ c2b_test_dependencies()
 
     char *p = NULL;
     char *path = NULL;
-    char *path_samtools = NULL;
-    char *path_sortbed = NULL;
-    char *path_starch = NULL;
-    char *samtools = NULL;
-    char *sortbed = NULL;
-    char *starch = NULL;
 
     if ((p = getenv("PATH")) == NULL) {
 	fprintf(stderr, "Error: Cannot retrieve environment PATH variable\n");
@@ -178,82 +259,94 @@ c2b_test_dependencies()
     }
     memcpy(path, p, strlen(p) + 1);
 
-    samtools = malloc(strlen(c2b_samtools) + 1);
-    if (!samtools) {
-	fprintf(stderr, "Error: Cannot allocate space for samtools variable copy\n");
-	exit(EXIT_FAILURE);
-    }
-    memcpy(samtools, c2b_samtools, strlen(c2b_samtools) + 1);
-
-    sortbed = malloc(strlen(c2b_sortbed) + 1);
-    if (!sortbed) {
-	fprintf(stderr, "Error: Cannot allocate space for sort-bed variable copy\n");
-	exit(EXIT_FAILURE);
-    }
-    memcpy(sortbed, c2b_sortbed, strlen(c2b_sortbed) + 1);
-
-    starch = malloc(strlen(c2b_starch) + 1);
-    if (!starch) {
-	fprintf(stderr, "Error: Cannot allocate space for starch variable copy\n");
-	exit(EXIT_FAILURE);
-    }
-    memcpy(starch, c2b_starch, strlen(c2b_starch) + 1);
-
-    path_samtools = malloc(strlen(path) + 1);
-    if (!path_samtools) {
-	fprintf(stderr, "Error: Cannot allocate space for path (samtools) copy\n");
-	exit(EXIT_FAILURE);
-    }
-    memcpy(path_samtools, path, strlen(path) + 1);
-
+    if ((c2b_global_args.input_format_idx == BAM_FORMAT) || (c2b_global_args.input_format_idx == SAM_FORMAT)) {
+	char *samtools = NULL;
+	samtools = malloc(strlen(c2b_samtools) + 1);
+	if (!samtools) {
+	    fprintf(stderr, "Error: Cannot allocate space for samtools variable copy\n");
+	    exit(EXIT_FAILURE);
+	}
+	memcpy(samtools, c2b_samtools, strlen(c2b_samtools) + 1);
+	
+	char *path_samtools = NULL;
+	path_samtools = malloc(strlen(path) + 1);
+	if (!path_samtools) {
+	    fprintf(stderr, "Error: Cannot allocate space for path (samtools) copy\n");
+	    exit(EXIT_FAILURE);
+	}
+	memcpy(path_samtools, path, strlen(path) + 1);
+	
 #ifdef DEBUG
-    fprintf(stderr, "Debug: Searching [%s] for samtools\n", path_samtools);
+	fprintf(stderr, "Debug: Searching [%s] for samtools\n", path_samtools);
+#endif
+	
+	if (c2b_print_matches(path_samtools, samtools) != kTrue) {
+	    fprintf(stderr, "Error: Cannot find samtools binary required for conversion of BAM and SAM format\n");
+	    exit(EXIT_FAILURE);    
+	}
+	free(path_samtools), path_samtools = NULL;
+	free(samtools), samtools = NULL;
+    }
+
+    if (c2b_global_args.sort_flag) {
+	char *sortbed = NULL;
+	sortbed = malloc(strlen(c2b_sortbed) + 1);
+	if (!sortbed) {
+	    fprintf(stderr, "Error: Cannot allocate space for sort-bed variable copy\n");
+	    exit(EXIT_FAILURE);
+	}
+	memcpy(sortbed, c2b_sortbed, strlen(c2b_sortbed) + 1);
+	
+	char *path_sortbed = NULL;
+	path_sortbed = malloc(strlen(path) + 1);
+	if (!path_sortbed) {
+	    fprintf(stderr, "Error: Cannot allocate space for path (samtools) copy\n");
+	    exit(EXIT_FAILURE);
+	}
+	memcpy(path_sortbed, path, strlen(path) + 1);
+	
+#ifdef DEBUG
+	fprintf(stderr, "Debug: Searching [%s] for samtools\n", path_sortbed);
 #endif
 
-    if (c2b_print_matches(path_samtools, samtools) != kTrue) {
-	fprintf(stderr, "Error: Cannot find samtools binary required for conversion of BAM and SAM format\n");
-	exit(EXIT_FAILURE);    
+	if (c2b_print_matches(path_sortbed, sortbed) != kTrue) {
+	    fprintf(stderr, "Error: Cannot find sort-bed binary required for sorting BED output\n");
+	    exit(EXIT_FAILURE);    
+	}
+	free(path_sortbed), path_sortbed = NULL;
+	free(sortbed), sortbed = NULL;
     }
 
-    path_sortbed = malloc(strlen(path) + 1);
-    if (!path_sortbed) {
-	fprintf(stderr, "Error: Cannot allocate space for path (samtools) copy\n");
-	exit(EXIT_FAILURE);
-    }
-    memcpy(path_sortbed, path, strlen(path) + 1);
-
+    if (c2b_global_args.output_format_idx == STARCH_FORMAT) {
+	char *starch = NULL;
+	starch = malloc(strlen(c2b_starch) + 1);
+	if (!starch) {
+	    fprintf(stderr, "Error: Cannot allocate space for starch variable copy\n");
+	    exit(EXIT_FAILURE);
+	}
+	memcpy(starch, c2b_starch, strlen(c2b_starch) + 1);
+	
+	char *path_starch = NULL;
+	path_starch = malloc(strlen(path) + 1);
+	if (!path_starch) {
+	    fprintf(stderr, "Error: Cannot allocate space for path (starch) copy\n");
+	    exit(EXIT_FAILURE);
+	}
+	memcpy(path_starch, path, strlen(path) + 1);
+	
 #ifdef DEBUG
-    fprintf(stderr, "Debug: Searching [%s] for samtools\n", path_sortbed);
+	fprintf(stderr, "Debug: Searching [%s] for starch\n", path_starch);
 #endif
-
-    if (c2b_print_matches(path_sortbed, sortbed) != kTrue) {
-	fprintf(stderr, "Error: Cannot find sort-bed binary required for sorting BED output\n");
-	exit(EXIT_FAILURE);    
-    }
-
-    path_starch = malloc(strlen(path) + 1);
-    if (!path_starch) {
-	fprintf(stderr, "Error: Cannot allocate space for path (starch) copy\n");
-	exit(EXIT_FAILURE);
-    }
-    memcpy(path_starch, path, strlen(path) + 1);
-
-#ifdef DEBUG
-    fprintf(stderr, "Debug: Searching [%s] for starch\n", path_starch);
-#endif
-
-    if (c2b_print_matches(path_starch, starch) != kTrue) {
-	fprintf(stderr, "Error: Cannot find starch binary required for compression of BED output\n");
-	exit(EXIT_FAILURE);    
+	
+	if (c2b_print_matches(path_starch, starch) != kTrue) {
+	    fprintf(stderr, "Error: Cannot find starch binary required for compression of BED output\n");
+	    exit(EXIT_FAILURE);    
+	}
+	free(path_starch), path_starch = NULL;
+	free(starch), starch = NULL;
     }
 
     free(path), path = NULL;
-    free(path_samtools), path_samtools = NULL;
-    free(path_sortbed), path_sortbed = NULL;
-    free(path_starch), path_starch = NULL;
-    free(samtools), samtools = NULL;
-    free(sortbed), sortbed = NULL;
-    free(starch), starch = NULL;
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_test_dependencies() - exit  ---\n");
@@ -362,6 +455,8 @@ c2b_init_globals()
     c2b_global_args.sortbed_path = NULL;
     c2b_global_args.starch_path = NULL;
 
+    c2b_global_args.sort_flag = kTrue;
+
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_init_globals() - exit  ---\n");
 #endif
@@ -384,6 +479,7 @@ c2b_delete_globals()
 	free(c2b_global_args.starch_path), c2b_global_args.starch_path = NULL;
 
     c2b_global_args.input_format_idx = UNDEFINED_FORMAT;
+    c2b_global_args.sort_flag = kTrue;
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_delete_globals() - exit  ---\n");
@@ -431,6 +527,9 @@ c2b_init_command_line_options(int argc, char **argv)
 	    c2b_global_args.output_format = c2b_to_lowercase(output_format);
 	    c2b_global_args.output_format_idx = c2b_to_output_format(c2b_global_args.output_format);
 	    free(output_format), output_format = NULL;
+	    break;
+	case 'd':
+	    c2b_global_args.sort_flag = kFalse;
 	    break;
 	case 'h':
 	    c2b_print_usage(stdout);

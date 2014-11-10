@@ -50,13 +50,16 @@ typedef enum format {
     UNDEFINED_FORMAT
 } c2b_format;
 
-#define PIPERD 0
-#define PIPEWR 1
+#define PIPE_READ 0
+#define PIPE_WRITE 1
+#define PIPE_STREAMS 2
+#define MAX_PIPES 4
 
 typedef struct pipeset {
-    int Ain[2];
-    int Aout[2];
-    int Aerr[2];
+    int **in;
+    int **out;
+    int **err;
+    size_t num; 
 } c2b_pipeset;
 
 #define PIPE4_FLAG_NONE       (0U)
@@ -85,7 +88,9 @@ static const char *usage = "\n" \
     "                Genomic format of input file; one of specified keys\n\n" \
     "  Other process flags:\n\n" \
     "  --output=[bed|starch] | -o [bed|starch]\n" \
-    "                Format of output file; one of specified keys\n\n" \
+    "                Format of output file; one of specified keys\n" \
+    "  --do-not-sort | -d\n" \
+    "                Do not sort BED output with sort-bed\n" \
     "  --help | -h   Show help message\n";
 
 static struct c2b_global_args_t {
@@ -96,21 +101,25 @@ static struct c2b_global_args_t {
     char *samtools_path;
     char *sortbed_path;
     char *starch_path;
+    boolean sort_flag;
 } c2b_global_args;
 
 static struct option c2b_client_long_options[] = {
     { "input",          required_argument,   NULL,    'i' },
     { "output",         required_argument,   NULL,    'o' },
+    { "do-not-sort",    no_argument,         NULL,    'd' },
     { "help",           no_argument,         NULL,    'h' },
     { NULL,             no_argument,         NULL,     0  }
 };
 
-static const char *c2b_client_opt_string = "f:h?";
+static const char *c2b_client_opt_string = "i:o:dh?";
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+    static void c2b_init_pipeset(c2b_pipeset *p, const size_t num);
+    static void c2b_delete_pipeset(c2b_pipeset *p);
     void * c2b_srcThreadMain(void *arg);
     void * c2b_destThreadMain(void *arg);
     void c2b_setCloseExecFlag(int fd);
