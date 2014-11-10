@@ -128,6 +128,7 @@ extern "C" {
     pid_t c2b_popen4(const char* cmd, int pin[2], int pout[2], int perr[2], int flags);
     static void c2b_test_dependencies();
     static boolean c2b_print_matches(char *path, char *fn);
+    static char * c2b_strsep(char **stringp, const char *delim);
     static boolean c2b_is_there(char *candidate);
     static void c2b_init_globals();
     static void c2b_delete_globals();
