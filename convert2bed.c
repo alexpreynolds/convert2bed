@@ -17,7 +17,7 @@ main(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
-void 
+static void 
 c2b_init_globals()
 {
 #ifdef DEBUG
@@ -32,7 +32,7 @@ c2b_init_globals()
 #endif
 }
 
-void
+static void
 c2b_delete_globals()
 {
 #ifdef DEBUG
@@ -47,7 +47,7 @@ c2b_delete_globals()
 #endif
 }
 
-void 
+static void 
 c2b_init_command_line_options(int argc, char **argv)
 {
 #ifdef DEBUG
@@ -73,7 +73,8 @@ c2b_init_command_line_options(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	    }
 	    strcpy(format, optarg);
-	    c2b_global_args.format = c2b_tolower(format);
+	    c2b_global_args.format = c2b_to_lowercase(format);
+	    c2b_global_args.format_idx = c2b_to_input_format(c2b_global_args.format);
 	    free(format), format = NULL;
 	    break;
 	case 'h':
@@ -92,7 +93,7 @@ c2b_init_command_line_options(int argc, char **argv)
                                  &client_long_index);
     }
 
-    if ((!c2b_global_args.format) || (c2b_toformat(c2b_global_args.format) == UNDEFINED_FORMAT)) {
+    if ((!c2b_global_args.format) || (c2b_global_args.format_idx == UNDEFINED_FORMAT)) {
 	c2b_print_usage(stderr);
 	exit(EXIT_FAILURE);
     }
@@ -102,7 +103,7 @@ c2b_init_command_line_options(int argc, char **argv)
 #endif
 }
 
-void 
+static void 
 c2b_print_usage(FILE *stream)
 {
 #ifdef DEBUG
@@ -124,15 +125,17 @@ c2b_print_usage(FILE *stream)
 #endif
 }
 
-char *
-c2b_tolower(char *src) 
+static char *
+c2b_to_lowercase(char *src) 
 {
 #ifdef DEBUG
-    fprintf(stderr, "--- c2b_tolower() - enter ---\n");
+    fprintf(stderr, "--- c2b_to_lowercase() - enter ---\n");
 #endif
 
     char *dest = NULL;
     char *p = NULL;
+    
+    if (!src) return dest;
 
     p = malloc(strlen(src) + 1);
     if (!p) {
@@ -144,17 +147,17 @@ c2b_tolower(char *src)
     for ( ; *p; ++p) *p = (*p >= 'A' && *p <= 'Z') ? (*p | 0x60) : *p;
 
 #ifdef DEBUG
-    fprintf(stderr, "--- c2b_tolower() - exit  ---\n");
+    fprintf(stderr, "--- c2b_to_lowercase() - exit  ---\n");
 #endif
     return dest;
 }
 
-c2b_format
-c2b_toformat(char *fmt)
+static c2b_format
+c2b_to_input_format(char *fmt)
 {
 #ifdef DEBUG
-    fprintf(stderr, "--- c2b_toformat() - enter ---\n");
-    fprintf(stderr, "--- c2b_toformat() - exit  ---\n");
+    fprintf(stderr, "--- c2b_to_input_format() - enter ---\n");
+    fprintf(stderr, "--- c2b_to_input_format() - exit  ---\n");
 #endif
 
     return 

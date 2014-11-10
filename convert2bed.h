@@ -26,6 +26,7 @@ const boolean kTrue = 1;
 const boolean kFalse = 0;
 
 typedef enum format {
+    BED_FORMAT,
     BAM_FORMAT,
     GFF_FORMAT,
     GTF_FORMAT,
@@ -66,12 +67,12 @@ static const char *c2b_client_opt_string = "f:h?";
 extern "C" {
 #endif
     
-    void c2b_init_globals();
-    void c2b_delete_globals();
-    void c2b_init_command_line_options(int argc, char **argv);
-    void c2b_print_usage(FILE *stream);
-    char * c2b_tolower(char *src);
-    c2b_format c2b_toformat(char *fmt);
+    static void c2b_init_globals();
+    static void c2b_delete_globals();
+    static void c2b_init_command_line_options(int argc, char **argv);
+    static void c2b_print_usage(FILE *stream);
+    static char * c2b_to_lowercase(char *src);
+    static c2b_format c2b_to_input_format(char *fmt);
 
 #ifdef __cplusplus
 }
