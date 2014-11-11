@@ -88,7 +88,7 @@ c2b_init_bam_conversion(c2b_pipeset *p)
     
     pthread_create(&sam2sam_thread,
 		   NULL,
-		   c2b_process_bytes,
+		   c2b_process_intermediate_bytes,
 		   &sam2sam_stage);
 
     pthread_create(&sam2stdout_thread,
