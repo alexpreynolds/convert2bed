@@ -37,6 +37,10 @@ extern const boolean kFalse;
 const boolean kTrue = 1;
 const boolean kFalse = 0;
 
+/*
+  Legal input and output formats
+*/
+
 typedef enum format {
     BED_FORMAT,
     STARCH_FORMAT,
@@ -50,17 +54,62 @@ typedef enum format {
     UNDEFINED_FORMAT
 } c2b_format;
 
-/* 
-   At most, we need 4 pipes to handle the most complex conversion
-   pipeline: 
-   
-   BAM -> SAM -> BED (unsorted) -> BED (sorted) -> Starch
-   
-   Here, each arrow represents a unidirectional path between
-   processing steps. 
-   
-   If a more complex pipeline arises, we can just increase the value
-   of MAX_PIPES.
+/*
+  At most, we need 4 pipes to handle the most complex conversion
+  pipeline: 
+  
+  BAM -> Starch
+  -----------------------------------------------------------------
+  BAM -> SAM -> BED (unsorted) -> BED (sorted) -> Starch
+  
+  Here, each arrow represents a unidirectional path between
+  processing steps. 
+  
+  Other possibilities are:
+  
+  BAM -> BED (sorted), BED (unsorted)
+  -----------------------------------------------------------------
+  BAM -> SAM -> BED (unsorted) -> BED (sorted)
+  BAM -> SAM -> BED (unsorted)
+  
+  GFF -> Starch, BED (sorted), BED (unsorted)
+  -----------------------------------------------------------------
+  GFF -> BED (unsorted) -> BED (sorted) -> Starch
+  GFF -> BED (unsorted) -> BED (sorted)
+  GFF -> BED (unsorted)
+  
+  GTF -> Starch, BED (sorted), BED (unsorted)
+  -----------------------------------------------------------------
+  GTF -> BED (unsorted) -> BED (sorted) -> Starch
+  GTF -> BED (unsorted) -> BED (sorted)
+  GTF -> BED (unsorted)
+  
+  PSL -> Starch, BED (sorted), BED (unsorted)
+  -----------------------------------------------------------------
+  PSL -> BED (unsorted) -> BED (sorted) -> Starch
+  PSL -> BED (unsorted) -> BED (sorted)
+  PSL -> BED (unsorted)
+  
+  SAM -> Starch, BED (sorted), BED (unsorted)
+  -----------------------------------------------------------------
+  SAM -> BED (unsorted) -> BED (sorted) -> Starch
+  SAM -> BED (unsorted) -> BED (sorted)
+  SAM -> BED (unsorted)
+  
+  VCF -> Starch, BED (sorted), BED (unsorted)
+  -----------------------------------------------------------------
+  VCF -> BED (unsorted) -> BED (sorted) -> Starch
+  VCF -> BED (unsorted) -> BED (sorted)
+  VCF -> BED (unsorted)
+  
+  WIG -> Starch, BED (sorted), BED (unsorted)
+  -----------------------------------------------------------------
+  WIG -> BED (unsorted) -> BED (sorted) -> Starch
+  WIG -> BED (unsorted) -> BED (sorted)
+  WIG -> BED (unsorted)
+  
+  If a more complex pipeline arises, we can just increase the value
+  of MAX_PIPES.
 */
 
 #define PIPE_READ 0
@@ -75,13 +124,19 @@ typedef struct pipeset {
     size_t num; 
 } c2b_pipeset;
 
+typedef struct pipeline_stage {
+    c2b_pipeset *pipeset;
+    unsigned int src;
+    unsigned int dest;
+} c2b_pipeline_stage;
+
 #define PIPE4_FLAG_NONE       (0U)
 #define PIPE4_FLAG_RD_CLOEXEC (1U << 0)
 #define PIPE4_FLAG_WR_CLOEXEC (1U << 1)
 
 #define c2b_pipe4_cloexec(fd) c2b_pipe4((fd), PIPE4_FLAG_RD_CLOEXEC | PIPE4_FLAG_WR_CLOEXEC)
 
-#define POPEN4_FLAG_NONE       (0U)
+#define POPEN4_FLAG_NONE                        (0U)
 #define POPEN4_FLAG_NOCLOSE_PARENT_STDIN        (1U << 0)
 #define POPEN4_FLAG_NOCLOSE_PARENT_STDOUT       (1U << 1)
 #define POPEN4_FLAG_NOCLOSE_PARENT_STDERR       (1U << 2)
@@ -131,23 +186,26 @@ static const char *c2b_client_opt_string = "i:o:dh?";
 extern "C" {
 #endif
 
-    static void c2b_init_pipeset(c2b_pipeset *p, const size_t num);
-    static void c2b_delete_pipeset(c2b_pipeset *p);
-    void * c2b_srcThreadMain(void *arg);
-    void * c2b_destThreadMain(void *arg);
-    void c2b_setCloseExecFlag(int fd);
-    void c2b_unsetCloseExecFlag(int fd);
-    int c2b_pipe4(int fd[2], int flags);
-    pid_t c2b_popen4(const char* cmd, int pin[2], int pout[2], int perr[2], int flags);
-    static void c2b_test_dependencies();
-    static boolean c2b_print_matches(char *path, char *fn);
-    static char * c2b_strsep(char **stringp, const char *delim);
-    static boolean c2b_is_there(char *candidate);
-    static void c2b_init_globals();
-    static void c2b_delete_globals();
-    static void c2b_init_command_line_options(int argc, char **argv);
-    static void c2b_print_usage(FILE *stream);
-    static char * c2b_to_lowercase(const char *src);
+    static void       c2b_init_conversion(c2b_pipeset *p);
+    static void       c2b_init_bam_conversion(c2b_pipeset *p);
+    static void       c2b_init_pipeset(c2b_pipeset *p, const size_t num);
+    static void       c2b_delete_pipeset(c2b_pipeset *p);
+    static void *     c2b_read_bytes_from_stdin(void *arg);
+    static void *     c2b_process_intermediate_bytes(void *arg);
+    static void *     c2b_write_bytes_to_stdout(void *arg);
+    static void       c2b_set_close_exec_flag(int fd);
+    static void       c2b_unset_close_exec_flag(int fd);
+    static int        c2b_pipe4(int fd[2], int flags);
+    static pid_t      c2b_popen4(const char* cmd, int pin[2], int pout[2], int perr[2], int flags);
+    static void       c2b_test_dependencies();
+    static boolean    c2b_print_matches(char *path, char *fn);
+    static char *     c2b_strsep(char **stringp, const char *delim);
+    static boolean    c2b_is_there(char *candidate);
+    static void       c2b_init_globals();
+    static void       c2b_delete_globals();
+    static void       c2b_init_command_line_options(int argc, char **argv);
+    static void       c2b_print_usage(FILE *stream);
+    static char *     c2b_to_lowercase(const char *src);
     static c2b_format c2b_to_input_format(const char *input_format);
     static c2b_format c2b_to_output_format(const char *output_format);
 

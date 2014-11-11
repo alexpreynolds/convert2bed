@@ -8,46 +8,17 @@ main(int argc, char **argv)
 #endif
 
     c2b_pipeset pipes;
-    pthread_t srcThread, destThread;
-    pid_t cat;
 
+    /* setup */
     c2b_init_globals();
     c2b_init_command_line_options(argc, argv);
     c2b_test_dependencies();
+    c2b_init_pipeset(&pipes, MAX_PIPES);
 
-    c2b_init_pipeset(&pipes, MAX_PIPES); 
-
-    /*
-       Depending on which input format, we can open pid_t instances
-       to handle data in a specified order. 
-    */
-
-    cat = c2b_popen4("cat -",
-		     pipes.in[0],
-		     pipes.out[0],
-		     pipes.err[0], 
-		     POPEN4_FLAG_NONE);
+    /* convert */
+    c2b_init_conversion(&pipes);
     
-    /*
-       Once we have the desired process instances, we create and join
-       threads for their ordered execution.
-    */
-
-    pthread_create(&srcThread,
-		   NULL,
-		   c2b_srcThreadMain,
-		   &pipes);
-
-    pthread_create(&destThread,
-		   NULL,
-		   c2b_destThreadMain,
-		   &pipes);
-
-    pthread_join(srcThread, (void **) NULL);
-    pthread_join(destThread, (void **) NULL);
-
     /* clean-up */
-
     c2b_delete_pipeset(&pipes);
     c2b_delete_globals();
 
@@ -55,6 +26,79 @@ main(int argc, char **argv)
     fprintf (stderr, "--- convert2bed main() - exit  ---\n");
 #endif
     return EXIT_SUCCESS;
+}
+
+static void
+c2b_init_conversion(c2b_pipeset *p) 
+{
+    if (c2b_global_args.input_format_idx == BAM_FORMAT)
+	c2b_init_bam_conversion(p);
+    else {
+	fprintf(stderr, "Error: Unsupported format\n");
+	exit(EXIT_FAILURE);
+    }
+}
+
+static void
+c2b_init_bam_conversion(c2b_pipeset *p)
+{
+    pthread_t bam2sam_thread, sam2sam_thread, sam2stdout_thread;
+    pid_t bam2sam_proc;
+    char bam2sam_cmd[LINE_LENGTH_VALUE] = {0};
+    const char *bam2sam_args = " view -h -";
+    c2b_pipeline_stage bam2sam_stage;
+
+    bam2sam_stage.pipeset = p;
+    bam2sam_stage.src = -1; /* src is really stdin */
+    bam2sam_stage.dest = 0;
+
+    c2b_pipeline_stage sam2sam_stage;
+
+    sam2sam_stage.pipeset = p;
+    sam2sam_stage.src = 0;
+    sam2sam_stage.dest = 1;
+
+    c2b_pipeline_stage sam2stdout_stage;
+
+    sam2stdout_stage.pipeset = p;
+    sam2stdout_stage.src = 1;
+    sam2stdout_stage.dest = -1; /* dest is stdout */
+
+    /*
+       We open pid_t instances to handle data in a specified order. 
+    */
+    memcpy(bam2sam_cmd, c2b_global_args.samtools_path, strlen(c2b_global_args.samtools_path));
+    memcpy(bam2sam_cmd + strlen(c2b_global_args.samtools_path), bam2sam_args, strlen(bam2sam_args));
+
+    bam2sam_proc = c2b_popen4(bam2sam_cmd,
+			      p->in[0],
+			      p->out[0],
+			      p->err[0], 
+			      POPEN4_FLAG_NONE);
+
+    /*
+       Once we have the desired process instances, we create and join
+       threads for their ordered execution.
+    */
+
+    pthread_create(&bam2sam_thread,
+		   NULL,
+		   c2b_read_bytes_from_stdin,
+		   &bam2sam_stage);
+    
+    pthread_create(&sam2sam_thread,
+		   NULL,
+		   c2b_process_bytes,
+		   &sam2sam_stage);
+
+    pthread_create(&sam2stdout_thread,
+		   NULL,
+		   c2b_write_bytes_to_stdout,
+		   &sam2stdout_stage);
+
+    pthread_join(bam2sam_thread, (void **) NULL);
+    pthread_join(sam2sam_thread, (void **) NULL);
+    pthread_join(sam2stdout_thread, (void **) NULL);
 }
 
 static void 
@@ -123,65 +167,88 @@ c2b_delete_pipeset(c2b_pipeset *p)
     p->num = 0;
 }
 
-void * 
-c2b_srcThreadMain(void *arg)
+static void * 
+c2b_read_bytes_from_stdin(void *arg)
 {
-    c2b_pipeset *pipes = (c2b_pipeset *) arg;
-    char c;
+    c2b_pipeline_stage *stage = (c2b_pipeline_stage *) arg;
+    c2b_pipeset *pipes = stage->pipeset;
+    char buffer[LINE_LENGTH_VALUE];
+    ssize_t bytes_read;
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-result"
-    while (read(STDIN_FILENO, &c, 1) > 0) {
-        write(pipes->in[0][PIPE_WRITE], &c, 1);
+    while ((bytes_read = read(STDIN_FILENO, buffer, LINE_LENGTH_VALUE)) > 0) {
+        write(pipes->in[stage->dest][PIPE_WRITE], buffer, bytes_read);
     }
-    close(pipes->in[0][PIPE_WRITE]);
+#pragma GCC diagnostic pop
+    close(pipes->in[stage->dest][PIPE_WRITE]);
+
+    pthread_exit(NULL);
+}
+
+static void *
+c2b_process_intermediate_bytes(void *arg)
+{
+    c2b_pipeline_stage *stage = (c2b_pipeline_stage *) arg;
+    c2b_pipeset *pipes = stage->pipeset;
+    char buffer[LINE_LENGTH_VALUE];
+    ssize_t bytes_read;
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-result"
+    while ((bytes_read = read(pipes->out[stage->src][PIPE_READ], buffer, LINE_LENGTH_VALUE)) > 0) {
+        write(pipes->in[stage->dest][PIPE_WRITE], buffer, bytes_read);
+    }
+#pragma GCC diagnostic pop
+    close(pipes->in[stage->dest][PIPE_WRITE]);
+
+    pthread_exit(NULL);
+}
+
+static void * 
+c2b_write_bytes_to_stdout(void *arg)
+{
+    c2b_pipeline_stage *stage = (c2b_pipeline_stage *) arg;
+    c2b_pipeset *pipes = stage->pipeset;
+    char buffer[LINE_LENGTH_VALUE];
+    ssize_t bytes_read;
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-result"
+    while ((bytes_read = read(pipes->in[stage->src][PIPE_READ], buffer, LINE_LENGTH_VALUE)) > 0) {
+        write(STDOUT_FILENO, buffer, bytes_read);
+    }
 #pragma GCC diagnostic pop
 
     pthread_exit(NULL);
 }
 
-void * 
-c2b_destThreadMain(void *arg)
-{
-    c2b_pipeset *pipes = (c2b_pipeset *) arg;
-    char c;
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-result"
-    while(read(pipes->out[0][PIPE_READ], &c, 1) > 0) {
-        write(STDOUT_FILENO, &c, 1);
-    }
-#pragma GCC diagnostic pop
-
-    pthread_exit(NULL);
-}
-
-void 
-c2b_setCloseExecFlag(int fd)
+static void 
+c2b_set_close_exec_flag(int fd)
 {
     fcntl(fd, F_SETFD, fcntl(fd, F_GETFD) | FD_CLOEXEC);
 }
 
-void 
-c2b_unsetCloseExecFlag(int fd)
+static void 
+c2b_unset_close_exec_flag(int fd)
 {
     fcntl(fd, F_SETFD, fcntl(fd, F_GETFD) & ~FD_CLOEXEC);
 }
 
-int 
+static int 
 c2b_pipe4(int fd[2], int flags)
 {
     int ret = pipe(fd);
     if (flags & PIPE4_FLAG_RD_CLOEXEC) { 
-	c2b_setCloseExecFlag(fd[PIPE_READ]); 
+	c2b_set_close_exec_flag(fd[PIPE_READ]); 
     }
     if (flags & PIPE4_FLAG_WR_CLOEXEC) { 
-	c2b_setCloseExecFlag(fd[PIPE_WRITE]); 
+	c2b_set_close_exec_flag(fd[PIPE_WRITE]); 
     }
     return ret;
 }
 
-pid_t 
+static pid_t 
 c2b_popen4(const char* cmd, int pin[2], int pout[2], int perr[2], int flags)
 {
     pid_t ret = fork();
@@ -194,22 +261,22 @@ c2b_popen4(const char* cmd, int pin[2], int pout[2], int perr[2], int flags)
          * Child-side of fork
          */
         if (flags & POPEN4_FLAG_CLOSE_CHILD_STDIN) {
-            close(0);
+            close(STDIN_FILENO);
         } else {
-            c2b_unsetCloseExecFlag(pin[PIPE_READ]);
-            dup2(pin[PIPE_READ], 0);
+            c2b_unset_close_exec_flag(pin[PIPE_READ]);
+            dup2(pin[PIPE_READ], STDIN_FILENO);
         }
         if (flags & POPEN4_FLAG_CLOSE_CHILD_STDOUT) {
-            close(1);
+            close(STDOUT_FILENO);
         } else {
-            c2b_unsetCloseExecFlag(pout[PIPE_WRITE]);
-            dup2(pout[PIPE_WRITE], 1);
+            c2b_unset_close_exec_flag(pout[PIPE_WRITE]);
+            dup2(pout[PIPE_WRITE], STDOUT_FILENO);
         }
         if (flags & POPEN4_FLAG_CLOSE_CHILD_STDERR) {
-            close(2);
+            close(STDERR_FILENO);
         } else {
-            c2b_unsetCloseExecFlag(perr[PIPE_WRITE]);
-            dup2(perr[PIPE_WRITE], 2);
+            c2b_unset_close_exec_flag(perr[PIPE_WRITE]);
+            dup2(perr[PIPE_WRITE], STDERR_FILENO);
         }
         execl("/bin/sh", "sh", "-c", cmd, NULL);
         fprintf(stderr, "exec() failed!\n");
