@@ -139,10 +139,14 @@ c2b_srcThreadMain(void *arg)
     c2b_pipeset *pipes = (c2b_pipeset *) arg;
     char c;
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-result"
     while (read(STDIN_FILENO, &c, 1) > 0) {
-        (void) write(pipes->in[0][PIPE_WRITE], &c, 1);
+        write(pipes->in[0][PIPE_WRITE], &c, 1);
     }
     close(pipes->in[0][PIPE_WRITE]);
+#pragma GCC diagnostic pop
+
     pthread_exit(NULL);
 }
 
@@ -152,9 +156,13 @@ c2b_destThreadMain(void *arg)
     c2b_pipeset *pipes = (c2b_pipeset *) arg;
     char c;
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-result"
     while(read(pipes->out[0][PIPE_READ], &c, 1) > 0) {
         write(STDOUT_FILENO, &c, 1);
     }
+#pragma GCC diagnostic pop
+
     pthread_exit(NULL);
 }
 
