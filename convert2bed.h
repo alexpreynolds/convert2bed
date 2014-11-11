@@ -50,6 +50,19 @@ typedef enum format {
     UNDEFINED_FORMAT
 } c2b_format;
 
+/* 
+   At most, we need 4 pipes to handle the most complex conversion
+   pipeline: 
+   
+   BAM -> SAM -> BED (unsorted) -> BED (sorted) -> Starch
+   
+   Here, each arrow represents a unidirectional path between
+   processing steps. 
+   
+   If a more complex pipeline arises, we can just increase the value
+   of MAX_PIPES.
+*/
+
 #define PIPE_READ 0
 #define PIPE_WRITE 1
 #define PIPE_STREAMS 2

@@ -15,16 +15,6 @@ main(int argc, char **argv)
     c2b_init_command_line_options(argc, argv);
     c2b_test_dependencies();
 
-    /* 
-       At most, we seem to need 4 pipes to handle the most complex pipeline: 
-       
-       BAM -> SAM -> BED (unsorted) -> BED (sorted) -> Starch
-       
-       Here, each arrow represents a bidirectional data pipe between
-       processing steps. If a more complex pipeline arises, we can  
-       just increase MAX_PIPES.
-    */
-
     c2b_init_pipeset(&pipes, MAX_PIPES); 
 
     /*
