@@ -138,10 +138,9 @@ c2b_srcThreadMain(void *arg)
 {
     c2b_pipeset *pipes = (c2b_pipeset *) arg;
     char c;
-    ssize_t write_bytes;
 
     while (read(STDIN_FILENO, &c, 1) > 0) {
-        write_bytes = write(pipes->in[0][PIPE_WRITE], &c, 1);
+        (void) write(pipes->in[0][PIPE_WRITE], &c, 1);
     }
     close(pipes->in[0][PIPE_WRITE]);
     pthread_exit(NULL);
