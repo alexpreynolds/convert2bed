@@ -164,8 +164,8 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
                                                               | 
                                           remainder_offset --- 
 
-          In other words, everything at and after index [remainder_offset + 1] to index
-          [src_bytes_read - 1] is a remainder byte:
+      In other words, everything at and after index [remainder_offset + 1] to index
+      [src_bytes_read - 1] is a remainder byte:
 
             src_buffer  [  .  .  .  \n  .  .  .  \n  .  .  .  \n R R R R R ]
 
@@ -186,14 +186,14 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
 
 	  Note that we leave the rest of the buffer untouched:
 
-	    src_buffer  [ R R R R R \n  .  .  .  \n  .  .  .  \n  .  .  .  ]
+	        src_buffer  [ R R R R R \n  .  .  .  \n  .  .  .  \n  .  .  .  ]
 
 	  On the subsequent read, we want to read() into src_buffer at position remainder_length
 	  and read up to, at most, (LINE_LENGTH_VALUE - remainder_length) bytes:
 
             read(byte_source, 
-	         src_buffer + remainder_length,
-		 LINE_LENGTH_VALUE - remainder_length)
+	             src_buffer + remainder_length,
+		         LINE_LENGTH_VALUE - remainder_length)
 
 	  This second read should reduce the maximum number of src_bytes_read from LINE_LENGTH_VALUE 
 	  to something smaller.
