@@ -163,14 +163,19 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
                                          remainder_offset --- 
 
            In other words, everything at and after index [remainder_offset + 1] to index
-           [src_bytes_read - 1] is a remainder byte:
+           [src_bytes_read - 1] is a remainder byte ("R"):
 
            src_buffer  [  .  .  .  \n  .  .  .  \n  .  .  .  \n R R R R R ]
+           
+           Assuming this failed:
 
            If remainder_offset is -1 and we have read LINE_LENGTH_VALUE bytes, then we know there 
            are no newlines anywhere in the src_buffer and so we terminate early with an error state.
            This would suggest either LINE_LENGTH_VALUE is too small to hold a whole intermediate 
-           line or the input data is perhaps corrupt.
+           line or the input data is perhaps corrupt. Basically, something went wrong and we need 
+           to investigate.
+           
+           Asumming this worked:
            
            We can now parse byte indices {[0 .. remainder_offset]} into lines, which are fed one
            by one to the line_functor. This functor parses out tab offsets and writes out a 
@@ -182,7 +187,7 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
            
            new_remainder_length = current_src_bytes_read + old_remainder_length - new_remainder_offset
            
-           Note that we leave the rest of the buffer untouched:
+           Note that we can leave the rest of the buffer untouched:
            
            src_buffer  [ R R R R R \n  .  .  .  \n  .  .  .  \n  .  .  .  ]
            
@@ -193,9 +198,9 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
                 src_buffer + remainder_length,
                 LINE_LENGTH_VALUE - remainder_length)
 
-           This second read should reduce the maximum number of src_bytes_read from LINE_LENGTH_VALUE 
-           to something smaller.
-                
+           Second and subsequent reads should reduce the maximum number of src_bytes_read from 
+           LINE_LENGTH_VALUE to something smaller.
+
            Note: We should look into doing a final pass through the line_functor, once we grab the 
            last buffer, after the last read().
         */
