@@ -42,34 +42,37 @@ c2b_init_conversion(c2b_pipeset *p)
 static void
 c2b_init_bam_conversion(c2b_pipeset *p)
 {
-    pthread_t bam2sam_thread, sam2sam_thread, sam2stdout_thread;
+    pthread_t bam2sam_thread, sam2bed_unsorted_thread, bed_unsorted2stdout_thread;
     pid_t bam2sam_proc;
     char bam2sam_cmd[LINE_LENGTH_VALUE] = {0};
     const char *bam2sam_args = " view -h -";
     c2b_pipeline_stage bam2sam_stage;
 
     bam2sam_stage.pipeset = p;
+    bam2sam_stage.line_functor = NULL;
     bam2sam_stage.src = -1; /* src is really stdin */
     bam2sam_stage.dest = 0;
 
-    c2b_pipeline_stage sam2sam_stage;
+    c2b_pipeline_stage sam2bed_unsorted_stage;
+    void (*sam2bed_unsorted_line_functor)(char *, char *) = c2b_line_convert_sam_bed;
 
-    sam2sam_stage.pipeset = p;
-    sam2sam_stage.src = 0;
-    sam2sam_stage.dest = 1;
+    sam2bed_unsorted_stage.pipeset = p;
+    sam2bed_unsorted_stage.line_functor = sam2bed_unsorted_line_functor;
+    sam2bed_unsorted_stage.src = 0;
+    sam2bed_unsorted_stage.dest = 1;
 
-    c2b_pipeline_stage sam2stdout_stage;
+    c2b_pipeline_stage bed_unsorted2stdout_stage;
 
-    sam2stdout_stage.pipeset = p;
-    sam2stdout_stage.src = 1;
-    sam2stdout_stage.dest = -1; /* dest is stdout */
+    bed_unsorted2stdout_stage.pipeset = p;
+    bed_unsorted2stdout_stage.line_functor = NULL;
+    bed_unsorted2stdout_stage.src = 1;
+    bed_unsorted2stdout_stage.dest = -1; /* dest is stdout */
 
     /*
-       We open pid_t instances to handle data in a specified order. 
+       We open pid_t (process) instances to handle data in a specified order. 
     */
     memcpy(bam2sam_cmd, c2b_global_args.samtools_path, strlen(c2b_global_args.samtools_path));
     memcpy(bam2sam_cmd + strlen(c2b_global_args.samtools_path), bam2sam_args, strlen(bam2sam_args));
-
     bam2sam_proc = c2b_popen4(bam2sam_cmd,
 			      p->in[0],
 			      p->out[0],
@@ -86,19 +89,171 @@ c2b_init_bam_conversion(c2b_pipeset *p)
 		   c2b_read_bytes_from_stdin,
 		   &bam2sam_stage);
     
-    pthread_create(&sam2sam_thread,
+    pthread_create(&sam2bed_unsorted_thread,
 		   NULL,
-		   c2b_process_intermediate_bytes,
-		   &sam2sam_stage);
+		   c2b_process_intermediate_bytes_by_lines,
+		   &sam2bed_unsorted_stage);
 
-    pthread_create(&sam2stdout_thread,
+    pthread_create(&bed_unsorted2stdout_thread,
 		   NULL,
 		   c2b_write_bytes_to_stdout,
-		   &sam2stdout_stage);
+		   &bed_unsorted2stdout_stage);
 
     pthread_join(bam2sam_thread, (void **) NULL);
-    pthread_join(sam2sam_thread, (void **) NULL);
-    pthread_join(sam2stdout_thread, (void **) NULL);
+    pthread_join(sam2bed_unsorted_thread, (void **) NULL);
+    pthread_join(bed_unsorted2stdout_thread, (void **) NULL);
+}
+
+static void
+c2b_line_convert_sam_bed(char *dest, char *src)
+{
+}
+
+static void * 
+c2b_read_bytes_from_stdin(void *arg)
+{
+    c2b_pipeline_stage *stage = (c2b_pipeline_stage *) arg;
+    c2b_pipeset *pipes = stage->pipeset;
+    char buffer[LINE_LENGTH_VALUE];
+    ssize_t bytes_read;
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-result"
+    while ((bytes_read = read(STDIN_FILENO, buffer, LINE_LENGTH_VALUE)) > 0) {
+        write(pipes->in[stage->dest][PIPE_WRITE], buffer, bytes_read);
+    }
+#pragma GCC diagnostic pop
+    close(pipes->in[stage->dest][PIPE_WRITE]);
+
+    pthread_exit(NULL);
+}
+
+static void *
+c2b_process_intermediate_bytes_by_lines(void *arg)
+{
+    c2b_pipeline_stage *stage = (c2b_pipeline_stage *) arg;
+    c2b_pipeset *pipes = stage->pipeset;
+    char src_buffer[LINE_LENGTH_VALUE];
+    ssize_t src_bytes_read = 0;
+    ssize_t remainder_length = 0;
+    ssize_t remainder_offset = 0;
+    char line_delim = '\n';
+    void (*line_functor)(char *, char *) = stage->line_functor;
+
+    /*
+      We read from the src out pipe, then write to the dest in pipe 
+    */
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-result"
+    while ((src_bytes_read = read(pipes->out[stage->src][PIPE_READ], 
+				  src_buffer + remainder_length, 
+				  LINE_LENGTH_VALUE - remainder_length)) > 0) {
+
+	/*
+	  Okay, so here's what src_buffer looks like initially; basically, some stuff separated 
+	  by newlines.
+
+	  The src_buffer will probably not terminate with a newline. So we first use a custom 
+	  memrchr() call to find the remainder_offset value:
+ 
+            src_buffer  [  .  .  .  \n  .  .  .  \n  .  .  .  \n  .  .  .  .  .  .  ]
+                         0 1 2 ...                            ^                    ^
+                                                              |                    |
+                                                              |   src_bytes_read --
+                                                              | 
+                                          remainder_offset --- 
+
+          In other words, everything at and after index [remainder_offset + 1] to index
+          [src_bytes_read - 1] is a remainder byte:
+
+            src_buffer  [  .  .  .  \n  .  .  .  \n  .  .  .  \n R R R R R ]
+
+	  If this offset is -1 and we read LINE_LENGTH_VALUE bytes, then we know there are 
+	  no newlines anywhere in the src_buffer and so we terminate early with an error state. 
+	  This would suggest either LINE_LENGTH_VALUE is too small to hold a whole intermediate 
+	  line or the input data is perhaps corrupt.
+
+	  We can now parse byte indices {[0 .. remainder_offset]} into lines, which are fed one
+	  by one to the line_functor. This functor parses out tab offsets and writes out a 
+	  reordered string based on the rules for the format (see BEDOPS docs for reordering 
+	  table).
+
+	  Finally, we write bytes from index [remainder_offset + 1] to [src_bytes_read - 1] 
+	  back to src_buffer. We are writing remainder_length bytes:
+
+            new_remainder_length = current_src_bytes_read + old_remainder_length - new_remainder_offset
+
+	  Note that we leave the rest of the buffer untouched:
+
+	    src_buffer  [ R R R R R \n  .  .  .  \n  .  .  .  \n  .  .  .  ]
+
+	  On the subsequent read, we want to read() into src_buffer at position remainder_length
+	  and read up to, at most, (LINE_LENGTH_VALUE - remainder_length) bytes:
+
+            read(byte_source, 
+	         src_buffer + remainder_length,
+		 LINE_LENGTH_VALUE - remainder_length)
+
+	  This second read should reduce the maximum number of src_bytes_read from LINE_LENGTH_VALUE 
+	  to something smaller.
+
+	  Note: We should look into doing a final pass through the line_functor, once we grab the 
+	  last buffer, after the last read().
+	  
+	 */
+
+        write(pipes->in[stage->dest][PIPE_WRITE], src_buffer + remainder_length, src_bytes_read);
+
+	c2b_memrchr_offset(&remainder_offset, src_buffer, src_bytes_read + remainder_length, line_delim);
+
+	if ((remainder_offset == -1) && (src_bytes_read + remainder_length == LINE_LENGTH_VALUE)) {
+	    fprintf(stderr, "Error: Could not find newline in intermediate buffer; check input\n");
+	    exit(EXIT_FAILURE);
+	}
+
+	remainder_length = src_bytes_read + remainder_length - remainder_offset;
+	memcpy(src_buffer, src_buffer + remainder_offset, remainder_length);
+    }
+#pragma GCC diagnostic pop
+    close(pipes->in[stage->dest][PIPE_WRITE]);
+
+    pthread_exit(NULL);
+}
+
+static void
+c2b_memrchr_offset(ssize_t *offset, char *buf, ssize_t len, char delim)
+{
+    ssize_t left = len;
+
+    /* fprintf(stderr, "[------------------]\n"); */
+    while (left > 0) {
+	/* fprintf(stderr, "[%zu : %c]\n", left, buf[left - 1]); */
+	if (buf[left - 1] == delim) {
+	    *offset = left;
+	    return;
+	}
+	left--;
+    }
+    *offset = -1;
+}
+
+static void * 
+c2b_write_bytes_to_stdout(void *arg)
+{
+    c2b_pipeline_stage *stage = (c2b_pipeline_stage *) arg;
+    c2b_pipeset *pipes = stage->pipeset;
+    char buffer[LINE_LENGTH_VALUE];
+    ssize_t bytes_read;
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-result"
+    while ((bytes_read = read(pipes->in[stage->src][PIPE_READ], buffer, LINE_LENGTH_VALUE)) > 0) {
+        write(STDOUT_FILENO, buffer, bytes_read);
+    }
+#pragma GCC diagnostic pop
+
+    pthread_exit(NULL);
 }
 
 static void 
@@ -165,62 +320,6 @@ c2b_delete_pipeset(c2b_pipeset *p)
     free(p->err), p->err = NULL;
 
     p->num = 0;
-}
-
-static void * 
-c2b_read_bytes_from_stdin(void *arg)
-{
-    c2b_pipeline_stage *stage = (c2b_pipeline_stage *) arg;
-    c2b_pipeset *pipes = stage->pipeset;
-    char buffer[LINE_LENGTH_VALUE];
-    ssize_t bytes_read;
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-result"
-    while ((bytes_read = read(STDIN_FILENO, buffer, LINE_LENGTH_VALUE)) > 0) {
-        write(pipes->in[stage->dest][PIPE_WRITE], buffer, bytes_read);
-    }
-#pragma GCC diagnostic pop
-    close(pipes->in[stage->dest][PIPE_WRITE]);
-
-    pthread_exit(NULL);
-}
-
-static void *
-c2b_process_intermediate_bytes(void *arg)
-{
-    c2b_pipeline_stage *stage = (c2b_pipeline_stage *) arg;
-    c2b_pipeset *pipes = stage->pipeset;
-    char buffer[LINE_LENGTH_VALUE];
-    ssize_t bytes_read;
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-result"
-    while ((bytes_read = read(pipes->out[stage->src][PIPE_READ], buffer, LINE_LENGTH_VALUE)) > 0) {
-        write(pipes->in[stage->dest][PIPE_WRITE], buffer, bytes_read);
-    }
-#pragma GCC diagnostic pop
-    close(pipes->in[stage->dest][PIPE_WRITE]);
-
-    pthread_exit(NULL);
-}
-
-static void * 
-c2b_write_bytes_to_stdout(void *arg)
-{
-    c2b_pipeline_stage *stage = (c2b_pipeline_stage *) arg;
-    c2b_pipeset *pipes = stage->pipeset;
-    char buffer[LINE_LENGTH_VALUE];
-    ssize_t bytes_read;
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-result"
-    while ((bytes_read = read(pipes->in[stage->src][PIPE_READ], buffer, LINE_LENGTH_VALUE)) > 0) {
-        write(STDOUT_FILENO, buffer, bytes_read);
-    }
-#pragma GCC diagnostic pop
-
-    pthread_exit(NULL);
 }
 
 static void 

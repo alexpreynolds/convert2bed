@@ -19,7 +19,7 @@
 #include <sys/param.h>
 
 #define C2B_VERSION "1.0"
-#define LINE_LENGTH_VALUE 65536
+#define LINE_LENGTH_VALUE 512
 
 extern const char *c2b_samtools;
 const char *c2b_samtools = "samtools";
@@ -126,6 +126,7 @@ typedef struct pipeset {
 
 typedef struct pipeline_stage {
     c2b_pipeset *pipeset;
+    void (*line_functor)();
     unsigned int src;
     unsigned int dest;
 } c2b_pipeline_stage;
@@ -188,11 +189,13 @@ extern "C" {
 
     static void       c2b_init_conversion(c2b_pipeset *p);
     static void       c2b_init_bam_conversion(c2b_pipeset *p);
+    static void       c2b_line_convert_sam_bed(char *dest, char *src);
+    static void *     c2b_read_bytes_from_stdin(void *arg);
+    static void *     c2b_process_intermediate_bytes_by_lines(void *arg);
+    static void       c2b_memrchr_offset(ssize_t *offset, char *buf, ssize_t len, char delim);
+    static void *     c2b_write_bytes_to_stdout(void *arg);
     static void       c2b_init_pipeset(c2b_pipeset *p, const size_t num);
     static void       c2b_delete_pipeset(c2b_pipeset *p);
-    static void *     c2b_read_bytes_from_stdin(void *arg);
-    static void *     c2b_process_intermediate_bytes(void *arg);
-    static void *     c2b_write_bytes_to_stdout(void *arg);
     static void       c2b_set_close_exec_flag(int fd);
     static void       c2b_unset_close_exec_flag(int fd);
     static int        c2b_pipe4(int fd[2], int flags);
