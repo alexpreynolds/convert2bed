@@ -150,7 +150,7 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
 				  src_buffer + remainder_length,
 				  LINE_LENGTH_VALUE - remainder_length)) > 0) {
 
-	/* 
+        /* 
            Okay, so here's what src_buffer looks like initially; basically, some stuff separated 
            by newlines.
            
@@ -200,19 +200,19 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
                 
            Note: We should look into doing a final pass through the line_functor, once we grab the 
            last buffer, after the last read().
-	 */
+        */
 
         write(pipes->in[stage->dest][PIPE_WRITE], src_buffer + remainder_length, src_bytes_read);
 
-	c2b_memrchr_offset(&remainder_offset, src_buffer, src_bytes_read + remainder_length, line_delim);
+        c2b_memrchr_offset(&remainder_offset, src_buffer, src_bytes_read + remainder_length, line_delim);
 
-	if ((remainder_offset == -1) && (src_bytes_read + remainder_length == LINE_LENGTH_VALUE)) {
-	    fprintf(stderr, "Error: Could not find newline in intermediate buffer; check input\n");
-	    exit(EXIT_FAILURE);
-	}
+        if ((remainder_offset == -1) && (src_bytes_read + remainder_length == LINE_LENGTH_VALUE)) {
+            fprintf(stderr, "Error: Could not find newline in intermediate buffer; check input\n");
+            exit(EXIT_FAILURE);
+        }
 
-	remainder_length = src_bytes_read + remainder_length - remainder_offset;
-	memcpy(src_buffer, src_buffer + remainder_offset, remainder_length);
+        remainder_length = src_bytes_read + remainder_length - remainder_offset;
+        memcpy(src_buffer, src_buffer + remainder_offset, remainder_length);
     }
 #pragma GCC diagnostic pop
     close(pipes->in[stage->dest][PIPE_WRITE]);
@@ -227,12 +227,12 @@ c2b_memrchr_offset(ssize_t *offset, char *buf, ssize_t len, char delim)
 
     /* fprintf(stderr, "[------------------]\n"); */
     while (left > 0) {
-	/* fprintf(stderr, "[%zu : %c]\n", left, buf[left - 1]); */
-	if (buf[left - 1] == delim) {
-	    *offset = left;
-	    return;
-	}
-	left--;
+        /* fprintf(stderr, "[%zu : %c]\n", left, buf[left - 1]); */
+        if (buf[left - 1] == delim) {
+            *offset = left;
+            return;
+        }
+        left--;
     }
     *offset = -1;
 }
