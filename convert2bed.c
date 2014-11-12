@@ -113,13 +113,18 @@ c2b_line_convert_sam_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
        tab-offset list to grab fields in the correct order.
     */
 
-    ssize_t sam_field_offsets[12] = {-1};
+    ssize_t sam_field_offsets[MAX_FIELD_LENGTH_VALUE] = {-1};
     int sam_field_idx = 0;
     const char tab_delim = '\t';
+    const char line_delim = '\n';
+    const char sam_header_prefix = '@';
     ssize_t current_src_posn = -1;
     
     while (++current_src_posn < src_size) {
-        if (src[current_src_posn] == tab_delim) {
+        if (src[current_src_posn] == sam_header_prefix) {
+            return;
+        }
+        if ((src[current_src_posn] == tab_delim) || (src[current_src_posn] == line_delim)) {
             sam_field_offsets[sam_field_idx++] = current_src_posn;
         }
     }
@@ -145,7 +150,7 @@ c2b_line_convert_sam_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
        8       TLEN
        9       SEQ
        10      QUAL
-       11      Optional alignment section fields (TAG:TYPE:VALUE)
+       11+     Optional alignment section fields (TAG:TYPE:VALUE)
 
        For SAM-formatted data, we use the mapping provided by BEDOPS convention described at: 
 
@@ -178,6 +183,94 @@ c2b_line_convert_sam_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
        -------------------------------------------------------------------------
        Alignment fields          14                     -
     */
+
+    /* Field 1 - RNAME */
+    ssize_t rname_size = sam_field_offsets[2] - sam_field_offsets[1];
+    memcpy(dest + *dest_size, src + sam_field_offsets[1] + 1, rname_size);
+    *dest_size += rname_size;
+
+    /* Field 2 - POS - 1 */
+    ssize_t pos_size = sam_field_offsets[3] - sam_field_offsets[2];
+    char pos_src_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    memcpy(pos_src_str, src + sam_field_offsets[2] + 1, pos_size);
+    unsigned long long int pos_val = strtoull(pos_src_str, NULL, 10);
+    char start_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    sprintf(start_str, "%llu\t", pos_val - 1);
+    memcpy(dest + *dest_size, start_str, strlen(start_str));
+    *dest_size += strlen(start_str);
+
+    /* Field 3 - POS + length(CIGAR) - 1 */
+    ssize_t cigar_size = sam_field_offsets[5] - sam_field_offsets[4];
+    ssize_t cigar_length = cigar_size - 1;
+    char stop_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    sprintf(stop_str, "%llu\t", pos_val + cigar_length - 1);
+    memcpy(dest + *dest_size, stop_str, strlen(stop_str));
+    *dest_size += strlen(stop_str);
+
+    /* Field 4 - QNAME */
+    ssize_t qname_size = sam_field_offsets[0] + 1;
+    memcpy(dest + *dest_size, src, qname_size);
+    *dest_size += qname_size;
+
+    /* Field 5 - FLAG */
+    ssize_t flag_size = sam_field_offsets[1] - sam_field_offsets[0];
+    memcpy(dest + *dest_size, src + sam_field_offsets[0] + 1, flag_size);
+    *dest_size += flag_size;
+
+    /* Field 6 - 16 & FLAG */
+    char flag_src_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    memcpy(flag_src_str, src + sam_field_offsets[0], flag_size - 1);
+    int flag_val = (int) strtol(flag_src_str, NULL, 10);
+    int strand_val = 0x10 & flag_val;
+    char strand_str[MAX_STRAND_LENGTH_VALUE] = {0};
+    sprintf(strand_str, "%c\t", (strand_val == 0x10) ? '+' : '-');
+    memcpy(dest + *dest_size, strand_str, strlen(strand_str));
+    *dest_size += strlen(strand_str);
+
+    /* Field 7 - MAPQ */
+    ssize_t mapq_size = sam_field_offsets[4] - sam_field_offsets[3];
+    memcpy(dest + *dest_size, src + sam_field_offsets[3] + 1, mapq_size);
+    *dest_size += mapq_size;
+
+    /* Field 8 - CIGAR */
+    memcpy(dest + *dest_size, src + sam_field_offsets[4] + 1, cigar_size);
+    *dest_size += cigar_size;
+
+    /* Field 9 - RNEXT */
+    ssize_t rnext_size = sam_field_offsets[6] - sam_field_offsets[5];
+    memcpy(dest + *dest_size, src + sam_field_offsets[5] + 1, rnext_size);
+    *dest_size += rnext_size;
+
+    /* Field 10 - PNEXT */
+    ssize_t pnext_size = sam_field_offsets[7] - sam_field_offsets[6];
+    memcpy(dest + *dest_size, src + sam_field_offsets[6] + 1, pnext_size);
+    *dest_size += pnext_size;
+
+    /* Field 11 - TLEN */
+    ssize_t tlen_size = sam_field_offsets[8] - sam_field_offsets[7];
+    memcpy(dest + *dest_size, src + sam_field_offsets[7] + 1, tlen_size);
+    *dest_size += tlen_size;
+
+    /* Field 12 - SEQ */
+    ssize_t seq_size = sam_field_offsets[9] - sam_field_offsets[8];
+    memcpy(dest + *dest_size, src + sam_field_offsets[8] + 1, seq_size);
+    *dest_size += seq_size;
+
+    /* Field 13 - QUAL */
+    ssize_t qual_size = sam_field_offsets[10] - sam_field_offsets[9];
+    memcpy(dest + *dest_size, src + sam_field_offsets[9] + 1, qual_size);
+    *dest_size += qual_size;
+
+    /* Field 14+ - Optional fields */
+    if (sam_field_offsets[11] == -1)
+        return;
+
+    int field_idx;
+    for (field_idx = 11; field_idx <= sam_field_idx; field_idx++) {
+        ssize_t opt_size = sam_field_offsets[field_idx] - sam_field_offsets[field_idx - 1];
+        memcpy(dest + *dest_size, src + sam_field_offsets[field_idx - 1] + 1, opt_size);
+        *dest_size += opt_size;
+    }
 }
 
 static void *
@@ -321,7 +414,7 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
             if (src_buffer[lines_offset] == line_delim) {
                 end_offset = lines_offset;
                 /* for a given line from src, we write dest_bytes_written number of bytes to dest_buffer (plus written offset) */
-                (*line_functor)(dest_buffer + dest_bytes_written, &dest_bytes_written, src_buffer + start_offset, end_offset - start_offset);
+                (*line_functor)(dest_buffer, &dest_bytes_written, src_buffer + start_offset, end_offset - start_offset);
                 start_offset = end_offset + 1;
             }
             lines_offset++;            
@@ -332,7 +425,7 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
            and can now write() this buffer to the in-pipe of the destination stage
         */
         
-        /* write(pipes->in[stage->dest][PIPE_WRITE], dest_buffer, dest_bytes_written); */
+        write(pipes->in[stage->dest][PIPE_WRITE], dest_buffer, dest_bytes_written);
 
 #pragma GCC diagnostic pop
 

@@ -19,8 +19,11 @@
 #include <sys/param.h>
 
 #define C2B_VERSION "1.0"
+
+#define MAX_FIELD_LENGTH_VALUE 1024
+#define MAX_STRAND_LENGTH_VALUE 3
 #define MAX_LINE_LENGTH_VALUE 65536
-#define MAX_LINES_VALUE 512
+#define MAX_LINES_VALUE 128
 
 extern const char *c2b_samtools;
 const char *c2b_samtools = "samtools";
