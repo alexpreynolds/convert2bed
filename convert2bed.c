@@ -155,10 +155,10 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
            by newlines.
            
            The src_buffer will probably not terminate with a newline. So we first use a custom 
-           memrchr() call to find the remainder_offset value:
+           memrchr() call to find the remainder_offset index value:
            
            src_buffer  [  .  .  .  \n  .  .  .  \n  .  .  .  \n  .  .  .  .  .  .  ]
-                        0 1 2 ...                            ^                    ^
+           index        0 1 2 ...                            ^                    ^
                                                              |                    |
                                                              |   src_bytes_read --
                                                              | 
