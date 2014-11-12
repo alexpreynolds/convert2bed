@@ -19,7 +19,8 @@
 #include <sys/param.h>
 
 #define C2B_VERSION "1.0"
-#define LINE_LENGTH_VALUE 512
+#define MAX_LINE_LENGTH_VALUE 65536
+#define MAX_LINES_VALUE 512
 
 extern const char *c2b_samtools;
 const char *c2b_samtools = "samtools";
@@ -37,8 +38,8 @@ extern const boolean kFalse;
 const boolean kTrue = 1;
 const boolean kFalse = 0;
 
-/*
-  Legal input and output formats
+/* 
+   Legal input and output formats
 */
 
 typedef enum format {
@@ -54,62 +55,62 @@ typedef enum format {
     UNDEFINED_FORMAT
 } c2b_format;
 
-/*
-  At most, we need 4 pipes to handle the most complex conversion
-  pipeline: 
-  
-  BAM -> Starch
-  -----------------------------------------------------------------
-  BAM -> SAM -> BED (unsorted) -> BED (sorted) -> Starch
-  
-  Here, each arrow represents a unidirectional path between
-  processing steps. 
-  
-  Other possibilities are:
-  
-  BAM -> BED (sorted), BED (unsorted)
-  -----------------------------------------------------------------
-  BAM -> SAM -> BED (unsorted) -> BED (sorted)
-  BAM -> SAM -> BED (unsorted)
-  
-  GFF -> Starch, BED (sorted), BED (unsorted)
-  -----------------------------------------------------------------
-  GFF -> BED (unsorted) -> BED (sorted) -> Starch
-  GFF -> BED (unsorted) -> BED (sorted)
-  GFF -> BED (unsorted)
-  
-  GTF -> Starch, BED (sorted), BED (unsorted)
-  -----------------------------------------------------------------
-  GTF -> BED (unsorted) -> BED (sorted) -> Starch
-  GTF -> BED (unsorted) -> BED (sorted)
-  GTF -> BED (unsorted)
-  
-  PSL -> Starch, BED (sorted), BED (unsorted)
-  -----------------------------------------------------------------
-  PSL -> BED (unsorted) -> BED (sorted) -> Starch
-  PSL -> BED (unsorted) -> BED (sorted)
-  PSL -> BED (unsorted)
-  
-  SAM -> Starch, BED (sorted), BED (unsorted)
-  -----------------------------------------------------------------
-  SAM -> BED (unsorted) -> BED (sorted) -> Starch
-  SAM -> BED (unsorted) -> BED (sorted)
-  SAM -> BED (unsorted)
-  
-  VCF -> Starch, BED (sorted), BED (unsorted)
-  -----------------------------------------------------------------
-  VCF -> BED (unsorted) -> BED (sorted) -> Starch
-  VCF -> BED (unsorted) -> BED (sorted)
-  VCF -> BED (unsorted)
-  
-  WIG -> Starch, BED (sorted), BED (unsorted)
-  -----------------------------------------------------------------
-  WIG -> BED (unsorted) -> BED (sorted) -> Starch
-  WIG -> BED (unsorted) -> BED (sorted)
-  WIG -> BED (unsorted)
-  
-  If a more complex pipeline arises, we can just increase the value
-  of MAX_PIPES.
+/* 
+   At most, we need 4 pipes to handle the most complex conversion
+   pipeline: 
+   
+   BAM -> Starch
+   -----------------------------------------------------------------
+   BAM -> SAM -> BED (unsorted) -> BED (sorted) -> Starch
+   
+   Here, each arrow represents a unidirectional path between
+   processing steps. 
+   
+   Other possibilities are:
+   
+   BAM -> BED (sorted), BED (unsorted)
+   -----------------------------------------------------------------
+   BAM -> SAM -> BED (unsorted) -> BED (sorted)
+   BAM -> SAM -> BED (unsorted)
+   
+   GFF -> Starch, BED (sorted), BED (unsorted)
+   -----------------------------------------------------------------
+   GFF -> BED (unsorted) -> BED (sorted) -> Starch
+   GFF -> BED (unsorted) -> BED (sorted)
+   GFF -> BED (unsorted)
+   
+   GTF -> Starch, BED (sorted), BED (unsorted)
+   -----------------------------------------------------------------
+   GTF -> BED (unsorted) -> BED (sorted) -> Starch
+   GTF -> BED (unsorted) -> BED (sorted)
+   GTF -> BED (unsorted)
+   
+   PSL -> Starch, BED (sorted), BED (unsorted)
+   -----------------------------------------------------------------
+   PSL -> BED (unsorted) -> BED (sorted) -> Starch
+   PSL -> BED (unsorted) -> BED (sorted)
+   PSL -> BED (unsorted)
+   
+   SAM -> Starch, BED (sorted), BED (unsorted)
+   -----------------------------------------------------------------
+   SAM -> BED (unsorted) -> BED (sorted) -> Starch
+   SAM -> BED (unsorted) -> BED (sorted)
+   SAM -> BED (unsorted)
+   
+   VCF -> Starch, BED (sorted), BED (unsorted)
+   -----------------------------------------------------------------
+   VCF -> BED (unsorted) -> BED (sorted) -> Starch
+   VCF -> BED (unsorted) -> BED (sorted)
+   VCF -> BED (unsorted)
+   
+   WIG -> Starch, BED (sorted), BED (unsorted)
+   -----------------------------------------------------------------
+   WIG -> BED (unsorted) -> BED (sorted) -> Starch
+   WIG -> BED (unsorted) -> BED (sorted)
+   WIG -> BED (unsorted)
+   
+   If a more complex pipeline arises, we can just increase the value
+   of MAX_PIPES.
 */
 
 #define PIPE_READ 0
@@ -189,10 +190,10 @@ extern "C" {
 
     static void       c2b_init_conversion(c2b_pipeset *p);
     static void       c2b_init_bam_conversion(c2b_pipeset *p);
-    static void       c2b_line_convert_sam_bed(char *dest, char *src);
+    static void       c2b_line_convert_sam_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
     static void *     c2b_read_bytes_from_stdin(void *arg);
     static void *     c2b_process_intermediate_bytes_by_lines(void *arg);
-    static void       c2b_memrchr_offset(ssize_t *offset, char *buf, ssize_t len, char delim);
+    static void       c2b_memrchr_offset(ssize_t *offset, char *buf, ssize_t buf_size, ssize_t len, char delim);
     static void *     c2b_write_bytes_to_stdout(void *arg);
     static void       c2b_init_pipeset(c2b_pipeset *p, const size_t num);
     static void       c2b_delete_pipeset(c2b_pipeset *p);

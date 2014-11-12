@@ -44,7 +44,7 @@ c2b_init_bam_conversion(c2b_pipeset *p)
 {
     pthread_t bam2sam_thread, sam2bed_unsorted_thread, bed_unsorted2stdout_thread;
     pid_t bam2sam_proc;
-    char bam2sam_cmd[LINE_LENGTH_VALUE] = {0};
+    char bam2sam_cmd[MAX_LINE_LENGTH_VALUE] = {0};
     const char *bam2sam_args = " view -h -";
     c2b_pipeline_stage bam2sam_stage;
 
@@ -54,7 +54,7 @@ c2b_init_bam_conversion(c2b_pipeset *p)
     bam2sam_stage.dest = 0;
 
     c2b_pipeline_stage sam2bed_unsorted_stage;
-    void (*sam2bed_unsorted_line_functor)(char *, char *) = c2b_line_convert_sam_bed;
+    void (*sam2bed_unsorted_line_functor)(char *, ssize_t *, char *, ssize_t) = c2b_line_convert_sam_to_bed_unsorted;
 
     sam2bed_unsorted_stage.pipeset = p;
     sam2bed_unsorted_stage.line_functor = sam2bed_unsorted_line_functor;
@@ -105,8 +105,79 @@ c2b_init_bam_conversion(c2b_pipeset *p)
 }
 
 static void
-c2b_line_convert_sam_bed(char *dest, char *src)
+c2b_line_convert_sam_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size)
 {
+    /* 
+       Scan the src buffer (all src_size bytes of it) to build a list of tab delimiter 
+       offsets. Then write content to the dest buffer, using offsets taken from the reordered 
+       tab-offset list to grab fields in the correct order.
+    */
+
+    ssize_t sam_field_offsets[12] = {-1};
+    int sam_field_idx = 0;
+    const char tab_delim = '\t';
+    ssize_t current_src_posn = -1;
+    
+    while (++current_src_posn < src_size) {
+        if (src[current_src_posn] == tab_delim) {
+            sam_field_offsets[sam_field_idx++] = current_src_posn;
+        }
+    }
+    sam_field_offsets[sam_field_idx] = src_size;
+
+    /*
+       The SAM format is described at:
+
+       http://samtools.github.io/hts-specs/SAMv1.pdf
+
+       SAM fields are in the following ordering:
+
+       Index   SAM field
+       -------------------------------------------------------------------------
+       0       QNAME
+       1       FLAG
+       2       RNAME
+       3       POS
+       4       MAPQ
+       5       CIGAR
+       6       RNEXT
+       7       PNEXT
+       8       TLEN
+       9       SEQ
+       10      QUAL
+       11      Optional alignment section fields (TAG:TYPE:VALUE)
+
+       For SAM-formatted data, we use the mapping provided by BEDOPS convention described at: 
+
+       http://bedops.readthedocs.org/en/latest/content/reference/file-management/conversion/sam2bed.html
+
+       SAM field                 BED column index       BED field
+       -------------------------------------------------------------------------
+       RNAME                     1                      chromosome
+       POS - 1                   2                      start
+       POS + length(CIGAR) - 1   3                      stop
+       QNAME                     4                      id
+       FLAG                      5                      score
+       16 & FLAG                 6                      strand
+
+       The remaining SAM columns are mapped as-is, in same order, to adjacent BED columns:
+
+       SAM field                 BED column index       BED field
+       -------------------------------------------------------------------------
+       MAPQ                      7                      -
+       CIGAR                     8                      -
+       RNEXT                     9                      -
+       PNEXT                     10                     -
+       TLEN                      11                     -
+       SEQ                       12                     -
+       QUAL                      13                     -
+
+       If present:
+
+       SAM field                 BED column index       BED field
+       -------------------------------------------------------------------------
+       Alignment fields          14                     -
+    */
 }
 
 static void *
@@ -114,12 +185,12 @@ c2b_read_bytes_from_stdin(void *arg)
 {
     c2b_pipeline_stage *stage = (c2b_pipeline_stage *) arg;
     c2b_pipeset *pipes = stage->pipeset;
-    char buffer[LINE_LENGTH_VALUE];
+    char buffer[MAX_LINE_LENGTH_VALUE];
     ssize_t bytes_read;
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-result"
-    while ((bytes_read = read(STDIN_FILENO, buffer, LINE_LENGTH_VALUE)) > 0) {
+    while ((bytes_read = read(STDIN_FILENO, buffer, MAX_LINE_LENGTH_VALUE)) > 0) {
         write(pipes->in[stage->dest][PIPE_WRITE], buffer, bytes_read);
     }
 #pragma GCC diagnostic pop
@@ -133,22 +204,39 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
 {
     c2b_pipeline_stage *stage = (c2b_pipeline_stage *) arg;
     c2b_pipeset *pipes = stage->pipeset;
-    char src_buffer[LINE_LENGTH_VALUE];
+    char *src_buffer = NULL;
+    ssize_t src_buffer_size = MAX_LINE_LENGTH_VALUE;
     ssize_t src_bytes_read = 0;
     ssize_t remainder_length = 0;
     ssize_t remainder_offset = 0;
     char line_delim = '\n';
-    void (*line_functor)(char *, char *) = stage->line_functor;
+    ssize_t lines_offset = 0;
+    ssize_t start_offset = 0;
+    ssize_t end_offset = 0;
+    char *dest_buffer = NULL;
+    ssize_t dest_buffer_size = MAX_LINE_LENGTH_VALUE * MAX_LINES_VALUE;
+    ssize_t dest_bytes_written = 0;
+    void (*line_functor)(char *, ssize_t *, char *, ssize_t) = stage->line_functor;
 
     /* 
        We read from the src out pipe, then write to the dest in pipe 
     */
+    
+    src_buffer = malloc(src_buffer_size);
+    if (!src_buffer) {
+        fprintf(stderr, "Error: Could not allocate space for intermediate source buffer.\n");
+        exit(EXIT_FAILURE);
+    }
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-result"
+    dest_buffer = malloc(dest_buffer_size);
+    if (!dest_buffer) {
+        fprintf(stderr, "Error: Could not allocate space for intermediate destination buffer.\n");
+        exit(EXIT_FAILURE);
+    }
+
     while ((src_bytes_read = read(pipes->out[stage->src][PIPE_READ],
 				  src_buffer + remainder_length,
-				  LINE_LENGTH_VALUE - remainder_length)) > 0) {
+				  src_buffer_size - remainder_length)) > 0) {
 
         /* 
            So here's what src_buffer looks like initially; basically, some stuff separated by
@@ -169,9 +257,9 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
            
            Assuming this failed:
 
-           If remainder_offset is -1 and we have read LINE_LENGTH_VALUE bytes, then we know there 
+           If remainder_offset is -1 and we have read src_buffer_size bytes, then we know there 
            are no newlines anywhere in the src_buffer and so we terminate early with an error state.
-           This would suggest either LINE_LENGTH_VALUE is too small to hold a whole intermediate 
+           This would suggest either src_buffer_size is too small to hold a whole intermediate 
            line or the input data is perhaps corrupt. Basically, something went wrong and we need 
            to investigate.
            
@@ -192,52 +280,93 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
            src_buffer  [ R R R R R \n  .  .  .  \n  .  .  .  \n  .  .  .  ]
            
            On the subsequent read, we want to read() into src_buffer at position remainder_length
-           and read up to, at most, (LINE_LENGTH_VALUE - remainder_length) bytes:
+           and read up to, at most, (src_buffer_size - remainder_length) bytes:
            
            read(byte_source, 
                 src_buffer + remainder_length,
-                LINE_LENGTH_VALUE - remainder_length)
+                src_buffer_size - remainder_length)
 
            Second and subsequent reads should reduce the maximum number of src_bytes_read from 
-           LINE_LENGTH_VALUE to something smaller.
+           src_buffer_size to something smaller.
 
            Note: We should look into doing a final pass through the line_functor, once we grab the 
            last buffer, after the last read().
         */
 
-        write(pipes->in[stage->dest][PIPE_WRITE], src_buffer + remainder_length, src_bytes_read);
+        c2b_memrchr_offset(&remainder_offset, src_buffer, src_buffer_size, src_bytes_read + remainder_length, line_delim);
 
-        c2b_memrchr_offset(&remainder_offset, src_buffer, src_bytes_read + remainder_length, line_delim);
-
-        if ((remainder_offset == -1) && (src_bytes_read + remainder_length == LINE_LENGTH_VALUE)) {
-            fprintf(stderr, "Error: Could not find newline in intermediate buffer; check input\n");
-            exit(EXIT_FAILURE);
+        if (remainder_offset == -1) {
+            if (src_bytes_read + remainder_length == src_buffer_size) {
+                fprintf(stderr, "Error: Could not find newline in intermediate buffer; check input\n");
+                exit(EXIT_FAILURE);
+            }
+            remainder_offset = 0;
         }
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-result"
+
+        /* write(pipes->in[stage->dest][PIPE_WRITE], src_buffer, remainder_offset); */
+
+        /* 
+           We next want to process bytes from index [0] to index [remainder_offset] for all
+           lines contained within. We basically build a buffer containing all translated 
+           lines to write downstream.
+        */
+
+        lines_offset = 0;
+        start_offset = 0;
+        dest_bytes_written = 0;
+        while (lines_offset <= remainder_offset) {
+            if (src_buffer[lines_offset] == line_delim) {
+                end_offset = lines_offset;
+                /* for a given line from src, we write dest_bytes_written number of bytes to dest_buffer (plus written offset) */
+                (*line_functor)(dest_buffer + dest_bytes_written, &dest_bytes_written, src_buffer + start_offset, end_offset - start_offset);
+                start_offset = end_offset + 1;
+            }
+            lines_offset++;            
+        }
+        
+        /* 
+           We have filled up dest_buffer with translated bytes (dest_bytes_written of them)
+           and can now write() this buffer to the in-pipe of the destination stage
+        */
+        
+        /* write(pipes->in[stage->dest][PIPE_WRITE], dest_buffer, dest_bytes_written); */
+
+#pragma GCC diagnostic pop
 
         remainder_length = src_bytes_read + remainder_length - remainder_offset;
         memcpy(src_buffer, src_buffer + remainder_offset, remainder_length);
     }
-#pragma GCC diagnostic pop
+
     close(pipes->in[stage->dest][PIPE_WRITE]);
+
+    if (src_buffer) 
+        free(src_buffer), src_buffer = NULL;
+
+    if (dest_buffer)
+        free(dest_buffer), dest_buffer = NULL;
 
     pthread_exit(NULL);
 }
 
 static void
-c2b_memrchr_offset(ssize_t *offset, char *buf, ssize_t len, char delim)
+c2b_memrchr_offset(ssize_t *offset, char *buf, ssize_t buf_size, ssize_t len, char delim)
 {
     ssize_t left = len;
+    
+    *offset = -1;
+    if (len > buf_size)
+        return;
 
-    /* fprintf(stderr, "[------------------]\n"); */
     while (left > 0) {
-        /* fprintf(stderr, "[%zu : %c]\n", left, buf[left - 1]); */
         if (buf[left - 1] == delim) {
             *offset = left;
             return;
         }
         left--;
     }
-    *offset = -1;
 }
 
 static void *
@@ -245,12 +374,12 @@ c2b_write_bytes_to_stdout(void *arg)
 {
     c2b_pipeline_stage *stage = (c2b_pipeline_stage *) arg;
     c2b_pipeset *pipes = stage->pipeset;
-    char buffer[LINE_LENGTH_VALUE];
+    char buffer[MAX_LINE_LENGTH_VALUE];
     ssize_t bytes_read;
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-result"
-    while ((bytes_read = read(pipes->in[stage->src][PIPE_READ], buffer, LINE_LENGTH_VALUE)) > 0) {
+    while ((bytes_read = read(pipes->in[stage->src][PIPE_READ], buffer, MAX_LINE_LENGTH_VALUE)) > 0) {
         write(STDOUT_FILENO, buffer, bytes_read);
     }
 #pragma GCC diagnostic pop
