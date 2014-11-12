@@ -151,11 +151,9 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
 				  LINE_LENGTH_VALUE - remainder_length)) > 0) {
 
         /* 
-           Okay, so here's what src_buffer looks like initially; basically, some stuff separated 
-           by newlines.
-           
-           The src_buffer will probably not terminate with a newline. So we first use a custom 
-           memrchr() call to find the remainder_offset index value:
+           So here's what src_buffer looks like initially; basically, some stuff separated by
+           newlines. The src_buffer will probably not terminate with a newline. So we first use 
+           a custom memrchr() call to find the remainder_offset index value:
            
            src_buffer  [  .  .  .  \n  .  .  .  \n  .  .  .  \n  .  .  .  .  .  .  ]
            index        0 1 2 ...                            ^                    ^
@@ -169,8 +167,8 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
 
            src_buffer  [  .  .  .  \n  .  .  .  \n  .  .  .  \n R R R R R ]
 
-           If this offset is -1 and we read LINE_LENGTH_VALUE bytes, then we know there are 
-           no newlines anywhere in the src_buffer and so we terminate early with an error state. 
+           If remainder_offset is -1 and we have read LINE_LENGTH_VALUE bytes, then we know there 
+           are no newlines anywhere in the src_buffer and so we terminate early with an error state.
            This would suggest either LINE_LENGTH_VALUE is too small to hold a whole intermediate 
            line or the input data is perhaps corrupt.
            
