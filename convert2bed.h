@@ -121,7 +121,7 @@ typedef struct pipeset {
     int **in;
     int **out;
     int **err;
-    size_t num; 
+    size_t num;
 } c2b_pipeset;
 
 typedef struct pipeline_stage {
