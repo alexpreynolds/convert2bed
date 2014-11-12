@@ -140,8 +140,8 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
     char line_delim = '\n';
     void (*line_functor)(char *, char *) = stage->line_functor;
 
-    /*
-      We read from the src out pipe, then write to the dest in pipe 
+    /* 
+       We read from the src out pipe, then write to the dest in pipe 
     */
 
 #pragma GCC diagnostic push
@@ -150,57 +150,56 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
 				  src_buffer + remainder_length,
 				  LINE_LENGTH_VALUE - remainder_length)) > 0) {
 
-	/*
-	  Okay, so here's what src_buffer looks like initially; basically, some stuff separated 
-	  by newlines.
+	/* 
+           Okay, so here's what src_buffer looks like initially; basically, some stuff separated 
+           by newlines.
+           
+           The src_buffer will probably not terminate with a newline. So we first use a custom 
+           memrchr() call to find the remainder_offset value:
+           
+           src_buffer  [  .  .  .  \n  .  .  .  \n  .  .  .  \n  .  .  .  .  .  .  ]
+                        0 1 2 ...                            ^                    ^
+                                                             |                    |
+                                                             |   src_bytes_read --
+                                                             | 
+                                         remainder_offset --- 
 
-	  The src_buffer will probably not terminate with a newline. So we first use a custom 
-	  memrchr() call to find the remainder_offset value:
- 
-            src_buffer  [  .  .  .  \n  .  .  .  \n  .  .  .  \n  .  .  .  .  .  .  ]
-                         0 1 2 ...                            ^                    ^
-                                                              |                    |
-                                                              |   src_bytes_read --
-                                                              | 
-                                          remainder_offset --- 
+           In other words, everything at and after index [remainder_offset + 1] to index
+           [src_bytes_read - 1] is a remainder byte:
 
-      In other words, everything at and after index [remainder_offset + 1] to index
-      [src_bytes_read - 1] is a remainder byte:
+           src_buffer  [  .  .  .  \n  .  .  .  \n  .  .  .  \n R R R R R ]
 
-            src_buffer  [  .  .  .  \n  .  .  .  \n  .  .  .  \n R R R R R ]
+           If this offset is -1 and we read LINE_LENGTH_VALUE bytes, then we know there are 
+           no newlines anywhere in the src_buffer and so we terminate early with an error state. 
+           This would suggest either LINE_LENGTH_VALUE is too small to hold a whole intermediate 
+           line or the input data is perhaps corrupt.
+           
+           We can now parse byte indices {[0 .. remainder_offset]} into lines, which are fed one
+           by one to the line_functor. This functor parses out tab offsets and writes out a 
+           reordered string based on the rules for the format (see BEDOPS docs for reordering 
+           table).
+           
+           Finally, we write bytes from index [remainder_offset + 1] to [src_bytes_read - 1] 
+           back to src_buffer. We are writing remainder_length bytes:
+           
+           new_remainder_length = current_src_bytes_read + old_remainder_length - new_remainder_offset
+           
+           Note that we leave the rest of the buffer untouched:
+           
+           src_buffer  [ R R R R R \n  .  .  .  \n  .  .  .  \n  .  .  .  ]
+           
+           On the subsequent read, we want to read() into src_buffer at position remainder_length
+           and read up to, at most, (LINE_LENGTH_VALUE - remainder_length) bytes:
+           
+           read(byte_source, 
+                src_buffer + remainder_length,
+		LINE_LENGTH_VALUE - remainder_length)
 
-	  If this offset is -1 and we read LINE_LENGTH_VALUE bytes, then we know there are 
-	  no newlines anywhere in the src_buffer and so we terminate early with an error state. 
-	  This would suggest either LINE_LENGTH_VALUE is too small to hold a whole intermediate 
-	  line or the input data is perhaps corrupt.
-
-	  We can now parse byte indices {[0 .. remainder_offset]} into lines, which are fed one
-	  by one to the line_functor. This functor parses out tab offsets and writes out a 
-	  reordered string based on the rules for the format (see BEDOPS docs for reordering 
-	  table).
-
-	  Finally, we write bytes from index [remainder_offset + 1] to [src_bytes_read - 1] 
-	  back to src_buffer. We are writing remainder_length bytes:
-
-            new_remainder_length = current_src_bytes_read + old_remainder_length - new_remainder_offset
-
-	  Note that we leave the rest of the buffer untouched:
-
-	        src_buffer  [ R R R R R \n  .  .  .  \n  .  .  .  \n  .  .  .  ]
-
-	  On the subsequent read, we want to read() into src_buffer at position remainder_length
-	  and read up to, at most, (LINE_LENGTH_VALUE - remainder_length) bytes:
-
-            read(byte_source, 
-	             src_buffer + remainder_length,
-		         LINE_LENGTH_VALUE - remainder_length)
-
-	  This second read should reduce the maximum number of src_bytes_read from LINE_LENGTH_VALUE 
-	  to something smaller.
-
-	  Note: We should look into doing a final pass through the line_functor, once we grab the 
-	  last buffer, after the last read().
-	  
+           This second read should reduce the maximum number of src_bytes_read from LINE_LENGTH_VALUE 
+           to something smaller.
+                
+           Note: We should look into doing a final pass through the line_functor, once we grab the 
+           last buffer, after the last read().
 	 */
 
         write(pipes->in[stage->dest][PIPE_WRITE], src_buffer + remainder_length, src_bytes_read);
