@@ -193,7 +193,7 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
            
            read(byte_source, 
                 src_buffer + remainder_length,
-		LINE_LENGTH_VALUE - remainder_length)
+                INE_LENGTH_VALUE - remainder_length)
 
            This second read should reduce the maximum number of src_bytes_read from LINE_LENGTH_VALUE 
            to something smaller.
