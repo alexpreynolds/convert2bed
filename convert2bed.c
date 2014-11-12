@@ -32,10 +32,10 @@ static void
 c2b_init_conversion(c2b_pipeset *p) 
 {
     if (c2b_global_args.input_format_idx == BAM_FORMAT)
-	c2b_init_bam_conversion(p);
+        c2b_init_bam_conversion(p);
     else {
-	fprintf(stderr, "Error: Unsupported format\n");
-	exit(EXIT_FAILURE);
+        fprintf(stderr, "Error: Unsupported format\n");
+        exit(EXIT_FAILURE);
     }
 }
 
