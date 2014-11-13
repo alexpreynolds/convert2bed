@@ -6,11 +6,13 @@
 #include <cstdlib>
 #include <cgetopt>
 #include <cstring>
+#include <cassert>
 #else
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
 #include <string.h>
+#include <assert.h>
 #endif
 #include <unistd.h>
 #include <pthread.h>
@@ -34,6 +36,12 @@ const char *c2b_starch = "starch";
 
 extern const char *c2b_default_output_format;
 const char *c2b_default_output_format = "bed";
+
+extern const char *c2b_unmapped_read_chr_name;
+const char *c2b_unmapped_read_chr_name = "_unmapped";
+
+extern const char *c2b_header_chr_name;
+const char *c2b_header_chr_name = "_header";
 
 typedef int boolean;
 extern const boolean kTrue;
@@ -159,6 +167,12 @@ static const char *usage = "\n" \
     "  Required process flags:\n\n" \
     "  --input=[bam|gff|gtf|psl|sam|vcf|wig] | -i [bam|gff|gtf|psl|sam|vcf|wig]\n" \
     "                Genomic format of input file; one of specified keys\n\n" \
+    "  Format-specific flags:\n\n" \
+    "  BAM\n\n" \
+    "  --all-reads | -a\n" \
+    "                Include both unmapped and mapped reads in output\n" \
+    "  --keep-header | -k\n" \
+    "                Preserve header section as pseudo-BED elements\n\n" \
     "  Other process flags:\n\n" \
     "  --output=[bed|starch] | -o [bed|starch]\n" \
     "                Format of output file; one of specified keys\n" \
@@ -175,17 +189,22 @@ static struct c2b_global_args_t {
     char *sortbed_path;
     char *starch_path;
     boolean sort_flag;
+    boolean all_reads_flag;
+    boolean keep_header_flag;
+    unsigned int header_line_idx;
 } c2b_global_args;
 
 static struct option c2b_client_long_options[] = {
     { "input",          required_argument,   NULL,    'i' },
     { "output",         required_argument,   NULL,    'o' },
     { "do-not-sort",    no_argument,         NULL,    'd' },
+    { "all-reads",      no_argument,         NULL,    'a' },
+    { "keep-header",    no_argument,         NULL,    'k' },
     { "help",           no_argument,         NULL,    'h' },
     { NULL,             no_argument,         NULL,     0  }
 };
 
-static const char *c2b_client_opt_string = "i:o:dh?";
+static const char *c2b_client_opt_string = "i:o:dakh?";
 
 #ifdef __cplusplus
 extern "C" {
@@ -196,8 +215,8 @@ extern "C" {
     static void       c2b_line_convert_sam_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
     static void *     c2b_read_bytes_from_stdin(void *arg);
     static void *     c2b_process_intermediate_bytes_by_lines(void *arg);
-    static void       c2b_memrchr_offset(ssize_t *offset, char *buf, ssize_t buf_size, ssize_t len, char delim);
     static void *     c2b_write_bytes_to_stdout(void *arg);
+    static void       c2b_memrchr_offset(ssize_t *offset, char *buf, ssize_t buf_size, ssize_t len, char delim);
     static void       c2b_init_pipeset(c2b_pipeset *p, const size_t num);
     static void       c2b_delete_pipeset(c2b_pipeset *p);
     static void       c2b_set_close_exec_flag(int fd);

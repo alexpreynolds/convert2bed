@@ -73,11 +73,15 @@ c2b_init_bam_conversion(c2b_pipeset *p)
     */
     memcpy(bam2sam_cmd, c2b_global_args.samtools_path, strlen(c2b_global_args.samtools_path));
     memcpy(bam2sam_cmd + strlen(c2b_global_args.samtools_path), bam2sam_args, strlen(bam2sam_args));
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
     bam2sam_proc = c2b_popen4(bam2sam_cmd,
 			      p->in[0],
 			      p->out[0],
 			      p->err[0],
 			      POPEN4_FLAG_NONE);
+#pragma GCC diagnostic pop
 
     /*
        Once we have the desired process instances, we create and join
@@ -119,10 +123,27 @@ c2b_line_convert_sam_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
     const char line_delim = '\n';
     const char sam_header_prefix = '@';
     ssize_t current_src_posn = -1;
-    
+
+    /* 
+       Find offsets or process header line 
+    */
     while (++current_src_posn < src_size) {
         if (src[current_src_posn] == sam_header_prefix) {
-            return;
+            if (!c2b_global_args.keep_header_flag) {
+                /* skip header line */
+                return;
+            }
+            else {
+                /* copy header line to destination stream buffer */
+                char src_header_line_str[MAX_LINE_LENGTH_VALUE] = {0};
+                char dest_header_line_str[MAX_LINE_LENGTH_VALUE] = {0};
+                memcpy(src_header_line_str, src, src_size);
+                sprintf(dest_header_line_str, "%s\t%u\t%u\t%s\n", c2b_header_chr_name, c2b_global_args.header_line_idx, (c2b_global_args.header_line_idx + 1), src_header_line_str);
+                memcpy(dest + *dest_size, dest_header_line_str, strlen(dest_header_line_str));
+                *dest_size += strlen(dest_header_line_str);
+                c2b_global_args.header_line_idx++;
+                return;
+            }
         }
         if ((src[current_src_posn] == tab_delim) || (src[current_src_posn] == line_delim)) {
             sam_field_offsets[sam_field_idx++] = current_src_posn;
@@ -165,6 +186,8 @@ c2b_line_convert_sam_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
        FLAG                      5                      score
        16 & FLAG                 6                      strand
 
+       If NOT (4 & FLAG) is true, then the read is mapped.
+
        The remaining SAM columns are mapped as-is, in same order, to adjacent BED columns:
 
        SAM field                 BED column index       BED field
@@ -181,21 +204,43 @@ c2b_line_convert_sam_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
 
        SAM field                 BED column index       BED field
        -------------------------------------------------------------------------
-       Alignment fields          14                     -
+       Alignment fields          14+                    -
     */
 
+    /* 
+       Is read mapped? If not, and c2b_global_args.all_reads_flag is kFalse, we 
+       skip over this line.
+    */
+
+    ssize_t flag_size = sam_field_offsets[1] - sam_field_offsets[0];
+    char flag_src_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    memcpy(flag_src_str, src + sam_field_offsets[0] + 1, flag_size);
+    int flag_val = (int) strtol(flag_src_str, NULL, 10);
+    boolean is_mapped = (boolean) !(4 & flag_val);
+    if ((!is_mapped) && (!c2b_global_args.all_reads_flag)) 
+        return;
+
     /* Field 1 - RNAME */
-    ssize_t rname_size = sam_field_offsets[2] - sam_field_offsets[1];
-    memcpy(dest + *dest_size, src + sam_field_offsets[1] + 1, rname_size);
-    *dest_size += rname_size;
+    if (is_mapped) {
+        ssize_t rname_size = sam_field_offsets[2] - sam_field_offsets[1];
+        memcpy(dest + *dest_size, src + sam_field_offsets[1] + 1, rname_size);
+        *dest_size += rname_size;
+    }
+    else {
+        char unmapped_read_chr_str[MAX_FIELD_LENGTH_VALUE] = {0};
+        memcpy(unmapped_read_chr_str, c2b_unmapped_read_chr_name, strlen(c2b_unmapped_read_chr_name));
+        unmapped_read_chr_str[strlen(c2b_unmapped_read_chr_name)] = '\t';
+        memcpy(dest + *dest_size, unmapped_read_chr_str, strlen(unmapped_read_chr_str));
+        *dest_size += strlen(unmapped_read_chr_str);
+    }
 
     /* Field 2 - POS - 1 */
     ssize_t pos_size = sam_field_offsets[3] - sam_field_offsets[2];
     char pos_src_str[MAX_FIELD_LENGTH_VALUE] = {0};
-    memcpy(pos_src_str, src + sam_field_offsets[2] + 1, pos_size);
+    memcpy(pos_src_str, src + sam_field_offsets[2] + 1, pos_size - 1);
     unsigned long long int pos_val = strtoull(pos_src_str, NULL, 10);
     char start_str[MAX_FIELD_LENGTH_VALUE] = {0};
-    sprintf(start_str, "%llu\t", pos_val - 1);
+    sprintf(start_str, "%llu\t", (is_mapped) ? pos_val - 1 : 0);
     memcpy(dest + *dest_size, start_str, strlen(start_str));
     *dest_size += strlen(start_str);
 
@@ -203,7 +248,7 @@ c2b_line_convert_sam_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
     ssize_t cigar_size = sam_field_offsets[5] - sam_field_offsets[4];
     ssize_t cigar_length = cigar_size - 1;
     char stop_str[MAX_FIELD_LENGTH_VALUE] = {0};
-    sprintf(stop_str, "%llu\t", pos_val + cigar_length - 1);
+    sprintf(stop_str, "%llu\t", (is_mapped) ? pos_val + cigar_length - 1 : 1);
     memcpy(dest + *dest_size, stop_str, strlen(stop_str));
     *dest_size += strlen(stop_str);
 
@@ -213,14 +258,10 @@ c2b_line_convert_sam_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
     *dest_size += qname_size;
 
     /* Field 5 - FLAG */
-    ssize_t flag_size = sam_field_offsets[1] - sam_field_offsets[0];
     memcpy(dest + *dest_size, src + sam_field_offsets[0] + 1, flag_size);
     *dest_size += flag_size;
 
     /* Field 6 - 16 & FLAG */
-    char flag_src_str[MAX_FIELD_LENGTH_VALUE] = {0};
-    memcpy(flag_src_str, src + sam_field_offsets[0], flag_size - 1);
-    int flag_val = (int) strtol(flag_src_str, NULL, 10);
     int strand_val = 0x10 & flag_val;
     char strand_str[MAX_STRAND_LENGTH_VALUE] = {0};
     sprintf(strand_str, "%c\t", (strand_val == 0x10) ? '+' : '-');
@@ -396,13 +437,8 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
             remainder_offset = 0;
         }
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-result"
-
-        /* write(pipes->in[stage->dest][PIPE_WRITE], src_buffer, remainder_offset); */
-
         /* 
-           We next want to process bytes from index [0] to index [remainder_offset] for all
+           We next want to process bytes from index [0] to index [remainder_offset - 1] for all
            lines contained within. We basically build a buffer containing all translated 
            lines to write downstream.
         */
@@ -410,7 +446,7 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
         lines_offset = 0;
         start_offset = 0;
         dest_bytes_written = 0;
-        while (lines_offset <= remainder_offset) {
+        while (lines_offset < remainder_offset) {
             if (src_buffer[lines_offset] == line_delim) {
                 end_offset = lines_offset;
                 /* for a given line from src, we write dest_bytes_written number of bytes to dest_buffer (plus written offset) */
@@ -425,8 +461,9 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
            and can now write() this buffer to the in-pipe of the destination stage
         */
         
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-result"
         write(pipes->in[stage->dest][PIPE_WRITE], dest_buffer, dest_bytes_written);
-
 #pragma GCC diagnostic pop
 
         remainder_length = src_bytes_read + remainder_length - remainder_offset;
@@ -440,6 +477,24 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
 
     if (dest_buffer)
         free(dest_buffer), dest_buffer = NULL;
+
+    pthread_exit(NULL);
+}
+
+static void *
+c2b_write_bytes_to_stdout(void *arg)
+{
+    c2b_pipeline_stage *stage = (c2b_pipeline_stage *) arg;
+    c2b_pipeset *pipes = stage->pipeset;
+    char buffer[MAX_LINE_LENGTH_VALUE];
+    ssize_t bytes_read;
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-result"
+    while ((bytes_read = read(pipes->in[stage->src][PIPE_READ], buffer, MAX_LINE_LENGTH_VALUE)) > 0) {
+        write(STDOUT_FILENO, buffer, bytes_read);
+    }
+#pragma GCC diagnostic pop
 
     pthread_exit(NULL);
 }
@@ -460,24 +515,6 @@ c2b_memrchr_offset(ssize_t *offset, char *buf, ssize_t buf_size, ssize_t len, ch
         }
         left--;
     }
-}
-
-static void *
-c2b_write_bytes_to_stdout(void *arg)
-{
-    c2b_pipeline_stage *stage = (c2b_pipeline_stage *) arg;
-    c2b_pipeset *pipes = stage->pipeset;
-    char buffer[MAX_LINE_LENGTH_VALUE];
-    ssize_t bytes_read;
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-result"
-    while ((bytes_read = read(pipes->in[stage->src][PIPE_READ], buffer, MAX_LINE_LENGTH_VALUE)) > 0) {
-        write(STDOUT_FILENO, buffer, bytes_read);
-    }
-#pragma GCC diagnostic pop
-
-    pthread_exit(NULL);
 }
 
 static void
@@ -875,6 +912,9 @@ c2b_init_globals()
     c2b_global_args.starch_path = NULL;
 
     c2b_global_args.sort_flag = kTrue;
+    c2b_global_args.all_reads_flag = kFalse;
+    c2b_global_args.keep_header_flag = kFalse;
+    c2b_global_args.header_line_idx = 0U;
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_init_globals() - exit  ---\n");
@@ -899,6 +939,9 @@ c2b_delete_globals()
 
     c2b_global_args.input_format_idx = UNDEFINED_FORMAT;
     c2b_global_args.sort_flag = kTrue;
+    c2b_global_args.all_reads_flag = kFalse;
+    c2b_global_args.keep_header_flag = kFalse;
+    c2b_global_args.header_line_idx = 0U;
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_delete_globals() - exit  ---\n");
@@ -924,7 +967,8 @@ c2b_init_command_line_options(int argc, char **argv)
     opterr = 0; /* disable error reporting by GNU getopt */
 
     while (client_opt != -1) {
-        switch (client_opt) {
+        switch (client_opt) 
+            {
             case 'i':
                 input_format = malloc(strlen(optarg) + 1);
                 if (!input_format) {
@@ -949,6 +993,12 @@ c2b_init_command_line_options(int argc, char **argv)
                 break;
             case 'd':
                 c2b_global_args.sort_flag = kFalse;
+                break;
+            case 'a':
+                c2b_global_args.all_reads_flag = kTrue;
+                break;
+            case 'k':
+                c2b_global_args.keep_header_flag = kTrue;
                 break;
             case 'h':
                 c2b_print_usage(stdout);
