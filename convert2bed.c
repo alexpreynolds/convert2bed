@@ -159,7 +159,7 @@ c2b_init_bam_conversion(c2b_pipeset *p)
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
         bed_unsorted2bed_sorted_proc = c2b_popen4(bed_unsorted2bed_sorted_cmd,
                                                   p->in[2],
-                                                  p->out[2],
+                                                  p->out[0],
                                                   p->err[2],
                                                   POPEN4_FLAG_NONE);
 #pragma GCC diagnostic pop
