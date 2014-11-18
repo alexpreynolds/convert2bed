@@ -7,11 +7,23 @@ main(int argc, char **argv)
     fprintf (stderr, "--- convert2bed main() - enter ---\n");
 #endif
 
+    struct stat stats;
+    int stats_res;
     c2b_pipeset pipes;
 
     /* setup */
     c2b_init_globals();
     c2b_init_command_line_options(argc, argv);
+    /* check that stdin is available */
+    if ((stats_res = fstat(fileno(stdin), &stats)) < 0) {
+        fprintf(stderr, "Error: fstat() call failed");
+        return EXIT_FAILURE;
+    }
+    if ((S_ISCHR(stats.st_mode) == kTrue) && (S_ISREG(stats.st_mode) == kFalse)) {
+        fprintf(stderr, "Error: No input is specified; please redirect or pipe in formatted data\n");
+        c2b_print_usage(stderr);
+        return EXIT_FAILURE;
+    }
     c2b_test_dependencies();
     c2b_init_pipeset(&pipes, MAX_PIPES);
 
@@ -42,37 +54,63 @@ c2b_init_conversion(c2b_pipeset *p)
 static void
 c2b_init_bam_conversion(c2b_pipeset *p)
 {
-    pthread_t bam2sam_thread, sam2bed_unsorted_thread, bed_unsorted2stdout_thread;
+    pthread_t bam2sam_thread; 
+    pthread_t sam2bed_unsorted_thread; 
+    pthread_t bed_unsorted2stdout_thread;
+    pthread_t bed_unsorted2bed_sorted_thread;
+    pthread_t bed_sorted2stdout_thread;
     pid_t bam2sam_proc;
     char bam2sam_cmd[MAX_LINE_LENGTH_VALUE] = {0};
     const char *bam2sam_args = " view -h -";
     c2b_pipeline_stage bam2sam_stage;
+    c2b_pipeline_stage sam2bed_unsorted_stage;
+    c2b_pipeline_stage bed_unsorted2stdout_stage;
+    c2b_pipeline_stage bed_unsorted2bed_sorted_stage;
+    c2b_pipeline_stage bed_sorted2stdout_stage;
+    pid_t bed_unsorted2bed_sorted_proc;
+    char bed_unsorted2bed_sorted_args[MAX_LINE_LENGTH_VALUE] = {0};
+    char bed_unsorted2bed_sorted_cmd[MAX_LINE_LENGTH_VALUE] = {0};
+    void (*sam2bed_unsorted_line_functor)(char *, ssize_t *, char *, ssize_t) = c2b_line_convert_sam_to_bed_unsorted;
 
     bam2sam_stage.pipeset = p;
     bam2sam_stage.line_functor = NULL;
     bam2sam_stage.src = -1; /* src is really stdin */
     bam2sam_stage.dest = 0;
 
-    c2b_pipeline_stage sam2bed_unsorted_stage;
-    void (*sam2bed_unsorted_line_functor)(char *, ssize_t *, char *, ssize_t) = c2b_line_convert_sam_to_bed_unsorted;
-
     sam2bed_unsorted_stage.pipeset = p;
     sam2bed_unsorted_stage.line_functor = sam2bed_unsorted_line_functor;
     sam2bed_unsorted_stage.src = 0;
     sam2bed_unsorted_stage.dest = 1;
 
-    c2b_pipeline_stage bed_unsorted2stdout_stage;
+    if (c2b_global_args.sort_flag == kFalse) {
+        bed_unsorted2stdout_stage.pipeset = p;
+        bed_unsorted2stdout_stage.line_functor = NULL;
+        bed_unsorted2stdout_stage.src = 1;
+        bed_unsorted2stdout_stage.dest = -1; /* dest BED is stdout */
+    }
+    else {
+        bed_unsorted2bed_sorted_stage.pipeset = p;
+        bed_unsorted2bed_sorted_stage.line_functor = NULL;
+        bed_unsorted2bed_sorted_stage.src = 1;
+        bed_unsorted2bed_sorted_stage.dest = 2;
 
-    bed_unsorted2stdout_stage.pipeset = p;
-    bed_unsorted2stdout_stage.line_functor = NULL;
-    bed_unsorted2stdout_stage.src = 1;
-    bed_unsorted2stdout_stage.dest = -1; /* dest is stdout */
+        bed_sorted2stdout_stage.pipeset = p;
+        bed_sorted2stdout_stage.line_functor = NULL;
+        bed_sorted2stdout_stage.src = 2;
+        bed_sorted2stdout_stage.dest = -1; /* dest BED is stdout */
+    }
 
     /*
        We open pid_t (process) instances to handle data in a specified order. 
     */
-    memcpy(bam2sam_cmd, c2b_global_args.samtools_path, strlen(c2b_global_args.samtools_path));
-    memcpy(bam2sam_cmd + strlen(c2b_global_args.samtools_path), bam2sam_args, strlen(bam2sam_args));
+    /* /path/to/samtools view -h - */
+    memcpy(bam2sam_cmd, 
+           c2b_global_args.samtools_path, 
+           strlen(c2b_global_args.samtools_path));
+    memcpy(bam2sam_cmd + strlen(c2b_global_args.samtools_path), 
+           bam2sam_args, 
+           strlen(bam2sam_args));
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
@@ -82,6 +120,50 @@ c2b_init_bam_conversion(c2b_pipeset *p)
 			      p->err[0],
 			      POPEN4_FLAG_NONE);
 #pragma GCC diagnostic pop
+
+    if (c2b_global_args.sort_flag) {
+        if (c2b_global_args.max_mem_value) {
+            memcpy(bed_unsorted2bed_sorted_args + strlen(bed_unsorted2bed_sorted_args), 
+                   sortbed_maxmem_arg, 
+                   strlen(sortbed_maxmem_arg));
+            memcpy(bed_unsorted2bed_sorted_args + strlen(bed_unsorted2bed_sorted_args), 
+                   c2b_global_args.max_mem_value, 
+                   strlen(c2b_global_args.max_mem_value));
+        }
+        else {
+            memcpy(bed_unsorted2bed_sorted_args, 
+                   sortbed_maxmem_default_arg, 
+                   strlen(sortbed_maxmem_default_arg));
+        }
+        if (c2b_global_args.sort_tmpdir_path) {
+            memcpy(bed_unsorted2bed_sorted_args + strlen(bed_unsorted2bed_sorted_args),
+                   sortbed_tmpdir_arg,
+                   strlen(sortbed_tmpdir_arg));
+            memcpy(bed_unsorted2bed_sorted_args + strlen(bed_unsorted2bed_sorted_args),
+                   c2b_global_args.sort_tmpdir_path,
+                   strlen(c2b_global_args.sort_tmpdir_path));
+        }
+        memcpy(bed_unsorted2bed_sorted_args + strlen(bed_unsorted2bed_sorted_args),
+               sortbed_stdin,
+               strlen(sortbed_stdin));
+        /* /path/to/sort-bed [--max-mem <val>] [--tmpdir <path>] - */
+        memcpy(bed_unsorted2bed_sorted_cmd, 
+               c2b_global_args.sortbed_path, 
+               strlen(c2b_global_args.sortbed_path));
+        memcpy(bed_unsorted2bed_sorted_cmd + strlen(c2b_global_args.sortbed_path), 
+               bed_unsorted2bed_sorted_args, 
+               strlen(bed_unsorted2bed_sorted_args));
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+        bed_unsorted2bed_sorted_proc = c2b_popen4(bed_unsorted2bed_sorted_cmd,
+                                                  p->in[2],
+                                                  p->out[2],
+                                                  p->err[2],
+                                                  POPEN4_FLAG_NONE);
+#pragma GCC diagnostic pop
+    }
 
     /*
        Once we have the desired process instances, we create and join
@@ -98,14 +180,32 @@ c2b_init_bam_conversion(c2b_pipeset *p)
 		   c2b_process_intermediate_bytes_by_lines,
 		   &sam2bed_unsorted_stage);
 
-    pthread_create(&bed_unsorted2stdout_thread,
-		   NULL,
-		   c2b_write_bytes_to_stdout,
-		   &bed_unsorted2stdout_stage);
+    if (!c2b_global_args.sort_flag) {
+        pthread_create(&bed_unsorted2stdout_thread,
+                       NULL,
+                       c2b_write_bytes_to_stdout,
+                       &bed_unsorted2stdout_stage);
+    }
+    else {
+        pthread_create(&bed_unsorted2bed_sorted_thread,
+                       NULL,
+                       c2b_write_bytes_to_process,
+                       &bed_unsorted2bed_sorted_stage);
+        pthread_create(&bed_sorted2stdout_thread,
+                       NULL,
+                       c2b_write_bytes_to_stdout,
+                       &bed_sorted2stdout_stage);
+    }
 
     pthread_join(bam2sam_thread, (void **) NULL);
     pthread_join(sam2bed_unsorted_thread, (void **) NULL);
-    pthread_join(bed_unsorted2stdout_thread, (void **) NULL);
+    if (c2b_global_args.sort_flag == kFalse) {
+        pthread_join(bed_unsorted2stdout_thread, (void **) NULL);
+    }
+    else {
+        pthread_join(bed_unsorted2bed_sorted_thread, (void **) NULL);
+        pthread_join(bed_sorted2stdout_thread, (void **) NULL);
+    }
 }
 
 static void
@@ -322,6 +422,10 @@ c2b_read_bytes_from_stdin(void *arg)
     char buffer[MAX_LINE_LENGTH_VALUE];
     ssize_t bytes_read;
 
+#ifdef DEBUG
+    fprintf(stderr, "\t-> c2b_read_bytes_from_stdin | src (%d) | dest (%d)\n", stage->src, stage->dest);
+#endif
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-result"
     while ((bytes_read = read(STDIN_FILENO, buffer, MAX_LINE_LENGTH_VALUE)) > 0) {
@@ -351,6 +455,10 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
     ssize_t dest_buffer_size = MAX_LINE_LENGTH_VALUE * MAX_LINES_VALUE;
     ssize_t dest_bytes_written = 0;
     void (*line_functor)(char *, ssize_t *, char *, ssize_t) = stage->line_functor;
+
+#ifdef DEBUG
+    fprintf(stderr, "\t-> c2b_process_intermediate_bytes_by_lines | src (%d) | dest (%d)\n", stage->src, stage->dest);
+#endif
 
     /* 
        We read from the src out pipe, then write to the dest in pipe 
@@ -482,12 +590,41 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
 }
 
 static void *
+c2b_write_bytes_to_process(void *arg)
+{
+    c2b_pipeline_stage *stage = (c2b_pipeline_stage *) arg;
+    c2b_pipeset *pipes = stage->pipeset;
+    char buffer[MAX_LINE_LENGTH_VALUE];
+    ssize_t bytes_read;
+
+#ifdef DEBUG
+    fprintf(stderr, "\t-> c2b_write_bytes_to_process | src (%d) | dest (%d)\n", stage->src, stage->dest);
+#endif
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-result"
+    /* read buffer from p->in[1] and write buffer to p->in[2] */
+    while ((bytes_read = read(pipes->in[stage->src][PIPE_READ], buffer, MAX_LINE_LENGTH_VALUE)) > 0) { 
+        write(pipes->in[stage->dest][PIPE_WRITE], buffer, bytes_read);
+    }
+#pragma GCC diagnostic pop
+
+    close(pipes->in[stage->dest][PIPE_WRITE]);
+
+    pthread_exit(NULL);
+}
+
+static void *
 c2b_write_bytes_to_stdout(void *arg)
 {
     c2b_pipeline_stage *stage = (c2b_pipeline_stage *) arg;
     c2b_pipeset *pipes = stage->pipeset;
     char buffer[MAX_LINE_LENGTH_VALUE];
     ssize_t bytes_read;
+
+#ifdef DEBUG
+    fprintf(stderr, "\t-> c2b_write_bytes_to_stdout | src (%d) | dest (%d)\n", stage->src, stage->dest);
+#endif
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-result"
@@ -616,7 +753,8 @@ c2b_popen4(const char* cmd, int pin[2], int pout[2], int perr[2], int flags)
     if (ret < 0) {
         fprintf(stderr, "fork() failed!\n");
         return ret;
-    } else if (ret == 0) {
+    } 
+    else if (ret == 0) {
         /**
          * Child-side of fork
          */
@@ -641,9 +779,9 @@ c2b_popen4(const char* cmd, int pin[2], int pout[2], int perr[2], int flags)
             c2b_unset_close_exec_flag(perr[PIPE_WRITE]);
             dup2(perr[PIPE_WRITE], STDERR_FILENO);
         }
-        execl("/bin/sh", "sh", "-c", cmd, NULL);
+        execl("/bin/sh", "/bin/sh", "-c", cmd, NULL);
         fprintf(stderr, "exec() failed!\n");
-        exit(-1);
+        exit(EXIT_FAILURE);
     }
     else {
         /**
@@ -877,10 +1015,10 @@ c2b_is_there(char *candidate)
     struct stat fin;
     boolean found = kFalse;
 
-    if (access(candidate, X_OK) == 0 &&
-	    stat(candidate, &fin) == 0 &&
-        S_ISREG(fin.st_mode) &&
-        (getuid() != 0 || (fin.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0)) {
+    if (access(candidate, X_OK) == 0 
+        && stat(candidate, &fin) == 0 
+        && S_ISREG(fin.st_mode) 
+        && (getuid() != 0 || (fin.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0)) {
 #ifdef DEBUG
 	    fprintf(stderr, "Debug: Found dependency [%s]\n", candidate);
 #endif
@@ -914,7 +1052,16 @@ c2b_init_globals()
     c2b_global_args.sort_flag = kTrue;
     c2b_global_args.all_reads_flag = kFalse;
     c2b_global_args.keep_header_flag = kFalse;
+    c2b_global_args.split_flag = kFalse;
+    c2b_global_args.headered_flag = kFalse;
+    c2b_global_args.vcf_snvs_flag = kFalse;
+    c2b_global_args.vcf_insertions_flag = kFalse;
+    c2b_global_args.vcf_deletions_flag = kFalse;
     c2b_global_args.header_line_idx = 0U;
+
+    c2b_global_args.max_mem_value = NULL;
+    c2b_global_args.sort_tmpdir_path = NULL;
+    c2b_global_args.wig_basename = NULL;
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_init_globals() - exit  ---\n");
@@ -941,7 +1088,19 @@ c2b_delete_globals()
     c2b_global_args.sort_flag = kTrue;
     c2b_global_args.all_reads_flag = kFalse;
     c2b_global_args.keep_header_flag = kFalse;
+    c2b_global_args.split_flag = kFalse;
+    c2b_global_args.headered_flag = kFalse;
+    c2b_global_args.vcf_snvs_flag = kFalse;
+    c2b_global_args.vcf_insertions_flag = kFalse;
+    c2b_global_args.vcf_deletions_flag = kFalse;
     c2b_global_args.header_line_idx = 0U;
+
+    if (c2b_global_args.max_mem_value)
+        free(c2b_global_args.max_mem_value), c2b_global_args.max_mem_value = NULL;
+    if (c2b_global_args.sort_tmpdir_path)
+        free(c2b_global_args.sort_tmpdir_path), c2b_global_args.sort_tmpdir_path = NULL;
+    if (c2b_global_args.wig_basename)
+        free(c2b_global_args.wig_basename), c2b_global_args.wig_basename = NULL;
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_delete_globals() - exit  ---\n");
@@ -990,6 +1149,22 @@ c2b_init_command_line_options(int argc, char **argv)
                 c2b_global_args.output_format = c2b_to_lowercase(output_format);
                 c2b_global_args.output_format_idx = c2b_to_output_format(c2b_global_args.output_format);
                 free(output_format), output_format = NULL;
+                break;
+            case 'm':
+                c2b_global_args.max_mem_value = malloc(strlen(optarg) + 1);
+                if (!c2b_global_args.max_mem_value) {
+                    fprintf(stderr, "Error: Could not allocate space for sort-bed max-mem argument\n");
+                    exit(EXIT_FAILURE);
+                }
+                memcpy(c2b_global_args.max_mem_value, optarg, strlen(optarg) + 1);
+                break;
+            case 'r':
+                c2b_global_args.sort_tmpdir_path = malloc(strlen(optarg) + 1);
+                if (!c2b_global_args.sort_tmpdir_path) {
+                    fprintf(stderr, "Error: Could not allocate space for sort-bed temporary directory argument\n");
+                    exit(EXIT_FAILURE);
+                }
+                memcpy(c2b_global_args.sort_tmpdir_path, optarg, strlen(optarg) + 1);
                 break;
             case 'd':
                 c2b_global_args.sort_flag = kFalse;

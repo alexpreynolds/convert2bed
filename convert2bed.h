@@ -43,6 +43,18 @@ const char *c2b_unmapped_read_chr_name = "_unmapped";
 extern const char *c2b_header_chr_name;
 const char *c2b_header_chr_name = "_header";
 
+extern const char *sortbed_maxmem_arg;
+const char *sortbed_maxmem_arg = " --max-mem ";
+
+extern const char *sortbed_maxmem_default_arg;
+const char *sortbed_maxmem_default_arg = " --max-mem 2G ";
+
+extern const char *sortbed_tmpdir_arg;
+const char *sortbed_tmpdir_arg = " --tmpdir ";
+
+extern const char *sortbed_stdin;
+const char *sortbed_stdin = " - ";
+
 typedef int boolean;
 extern const boolean kTrue;
 extern const boolean kFalse;
@@ -161,24 +173,63 @@ static const char *name = "convert2bed";
 static const char *version = C2B_VERSION;
 static const char *authors = "Alex Reynolds";
 static const char *usage = "\n" \
-    "Usage: convert2bed --input=[format] < input > output\n" \
+    "Usage: convert2bed --input=fmt [--output=fmt] [options] < input > output\n" \
     "\n" \
-    "  Convert common binary and text genomic formats to BED\n\n" \
+    "  Convert common binary and text genomic formats to BED or BEDOPS Starch (compressed BED)\n\n" \
+    "  Input can be a regular file or standard input piped in using the hyphen character ('-')\n\n" \
     "  Required process flags:\n\n" \
     "  --input=[bam|gff|gtf|psl|sam|vcf|wig] | -i [bam|gff|gtf|psl|sam|vcf|wig]\n" \
-    "                Genomic format of input file; one of specified keys\n\n" \
-    "  Format-specific flags:\n\n" \
-    "  BAM\n\n" \
+    "      Genomic format of input file (required)\n\n" \
+    "  Format-specific options:\n\n" \
+    "  BAM/SAM\n" \
+    "  -----------------------------------------------------------------------\n" \
     "  --all-reads | -a\n" \
-    "                Include both unmapped and mapped reads in output\n" \
+    "      Include both unmapped and mapped reads in output\n" \
     "  --keep-header | -k\n" \
-    "                Preserve header section as pseudo-BED elements\n\n" \
-    "  Other process flags:\n\n" \
+    "      Preserve header section as pseudo-BED elements\n" \
+    "  --split | -s\n" \
+    "      Split reads with 'N' CIGAR operations into separate BED elements\n\n" \
+    "  GFF\n" \
+    "  -----------------------------------------------------------------------\n" \
+    "  --keep-header | -k\n" \
+    "      Preserve header section as pseudo-BED elements\n\n" \
+    "  PSL\n" \
+    "  -----------------------------------------------------------------------\n" \
+    "  --headered | -p\n" \
+    "      Convert headered PSL input to BED (default is headerless)\n" \
+    "  --keep-header | -k\n" \
+    "      Preserve header section as pseudo-BED elements (requires --headered)\n\n" \
+    "  VCF\n" \
+    "  -----------------------------------------------------------------------\n" \
+    "  --snvs | -v\n" \
+    "      Report only single nucleotide variants\n" \
+    "  --insertions | -t\n" \
+    "      Report only insertion variants\n" \
+    "  --deletions | -n\n" \
+    "      Report only deletion variants\n" \
+    "  --keep-header | -k\n" \
+    "      Preserve header section as pseudo-BED elements\n\n" \
+    "  WIG\n" \
+    "  -----------------------------------------------------------------------\n" \
+    "  --multisplit=[basename] | -b [basename]\n" \
+    "      A single input file may have multiple WIG sections; a user may pass in\n" \
+    "      more than one file, or both may occur. With this option, every separate\n" \
+    "      input goes to a separate output, starting with [basename].1, then\n" \
+    "      [basename].2, and so on\n\n" \
+    "  Other process options:\n\n" \
     "  --output=[bed|starch] | -o [bed|starch]\n" \
-    "                Format of output file; one of specified keys\n" \
+    "      Format of output file (optional, default is BED)\n" \
     "  --do-not-sort | -d\n" \
-    "                Do not sort BED output with sort-bed\n" \
-    "  --help | -h   Show help message\n";
+    "      Do not sort BED output with sort-bed (not compatible with --output=starch)\n" \
+    "  --max-mem=[value] | -m [value]\n" \
+    "      Sets aside [value] memory for sorting BED output. For example, [value] can\n" \
+    "      be 8G, 8000M or 8000000000 to specify 8 GB of memory (default is 2G)\n"
+    "  --sort-tmpdir=[dir] | -r [dir]\n" \
+    "      Optionally sets [dir] as temporary directory for sort data, when used in\n" \
+    "      conjunction with --max-mem=[value], instead of the host's operating system\n" \
+    "      default temporary directory\n" \
+    "  --help | -h\n" \
+    "      Show help message\n";
 
 static struct c2b_global_args_t {
     char *input_format;
@@ -191,6 +242,14 @@ static struct c2b_global_args_t {
     boolean sort_flag;
     boolean all_reads_flag;
     boolean keep_header_flag;
+    boolean split_flag;
+    boolean headered_flag;
+    boolean vcf_snvs_flag;
+    boolean vcf_insertions_flag;
+    boolean vcf_deletions_flag;
+    char *max_mem_value;
+    char *sort_tmpdir_path;
+    char *wig_basename;
     unsigned int header_line_idx;
 } c2b_global_args;
 
@@ -200,11 +259,19 @@ static struct option c2b_client_long_options[] = {
     { "do-not-sort",    no_argument,         NULL,    'd' },
     { "all-reads",      no_argument,         NULL,    'a' },
     { "keep-header",    no_argument,         NULL,    'k' },
+    { "split",          no_argument,         NULL,    's' },
+    { "headered",       no_argument,         NULL,    'p' },
+    { "snvs",           no_argument,         NULL,    'v' },
+    { "insertions",     no_argument,         NULL,    't' },
+    { "deletions",      no_argument,         NULL,    'n' },
+    { "max-mem",        required_argument,   NULL,    'm' },
+    { "sort-tmpdir",    required_argument,   NULL,    'r' },
+    { "basename",       required_argument,   NULL,    'b' },
     { "help",           no_argument,         NULL,    'h' },
     { NULL,             no_argument,         NULL,     0  }
 };
 
-static const char *c2b_client_opt_string = "i:o:dakh?";
+static const char *c2b_client_opt_string = "i:o:dakspvtnm:r:b:h?";
 
 #ifdef __cplusplus
 extern "C" {
@@ -215,6 +282,7 @@ extern "C" {
     static void       c2b_line_convert_sam_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
     static void *     c2b_read_bytes_from_stdin(void *arg);
     static void *     c2b_process_intermediate_bytes_by_lines(void *arg);
+    static void *     c2b_write_bytes_to_process(void *arg);
     static void *     c2b_write_bytes_to_stdout(void *arg);
     static void       c2b_memrchr_offset(ssize_t *offset, char *buf, ssize_t buf_size, ssize_t len, char delim);
     static void       c2b_init_pipeset(c2b_pipeset *p, const size_t num);
