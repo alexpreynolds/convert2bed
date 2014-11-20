@@ -119,6 +119,7 @@ c2b_init_bam_conversion(c2b_pipeset *p)
 			      p->out[0],
 			      p->err[0],
 			      POPEN4_FLAG_NONE);
+
 #pragma GCC diagnostic pop
 
     if (c2b_global_args.sort_flag) {
@@ -159,11 +160,15 @@ c2b_init_bam_conversion(c2b_pipeset *p)
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
         bed_unsorted2bed_sorted_proc = c2b_popen4(bed_unsorted2bed_sorted_cmd,
                                                   p->in[2],
-                                                  p->out[0],
+                                                  p->out[2],
                                                   p->err[2],
                                                   POPEN4_FLAG_NONE);
 #pragma GCC diagnostic pop
     }
+
+#ifdef DEBUG
+    c2b_debug_pipeset(p, MAX_PIPES);
+#endif
 
     /*
        Once we have the desired process instances, we create and join
@@ -423,7 +428,7 @@ c2b_read_bytes_from_stdin(void *arg)
     ssize_t bytes_read;
 
 #ifdef DEBUG
-    fprintf(stderr, "\t-> c2b_read_bytes_from_stdin | src (%d) | dest (%d)\n", stage->src, stage->dest);
+    fprintf(stderr, "\t-> c2b_read_bytes_from_stdin | reading from fd     (%02d) | writing to fd     (%02d)\n", STDIN_FILENO, pipes->in[stage->dest][PIPE_WRITE]);
 #endif
 
 #pragma GCC diagnostic push
@@ -457,7 +462,7 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
     void (*line_functor)(char *, ssize_t *, char *, ssize_t) = stage->line_functor;
 
 #ifdef DEBUG
-    fprintf(stderr, "\t-> c2b_process_intermediate_bytes_by_lines | src (%d) | dest (%d)\n", stage->src, stage->dest);
+    fprintf(stderr, "\t-> c2b_process_intermediate_bytes_by_lines | reading from fd  (%02d) | writing to fd  (%02d)\n", pipes->out[stage->src][PIPE_READ], pipes->in[stage->dest][PIPE_WRITE]);
 #endif
 
     /* 
@@ -598,12 +603,12 @@ c2b_write_bytes_to_process(void *arg)
     ssize_t bytes_read;
 
 #ifdef DEBUG
-    fprintf(stderr, "\t-> c2b_write_bytes_to_process | src (%d) | dest (%d)\n", stage->src, stage->dest);
+    fprintf(stderr, "\t-> c2b_write_bytes_to_process | reading from fd  (%02d) | writing to fd  (%02d)\n", pipes->out[stage->src][PIPE_READ], pipes->in[stage->dest][PIPE_WRITE]);
 #endif
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-result"
-    /* read buffer from p->in[1] and write buffer to p->in[2] */
+    /* read buffer from p->in[1] and write buffer to p->out[2] */
     while ((bytes_read = read(pipes->in[stage->src][PIPE_READ], buffer, MAX_LINE_LENGTH_VALUE)) > 0) { 
         write(pipes->in[stage->dest][PIPE_WRITE], buffer, bytes_read);
     }
@@ -623,17 +628,35 @@ c2b_write_bytes_to_stdout(void *arg)
     ssize_t bytes_read;
 
 #ifdef DEBUG
-    fprintf(stderr, "\t-> c2b_write_bytes_to_stdout | src (%d) | dest (%d)\n", stage->src, stage->dest);
+    fprintf(stderr, "\t-> c2b_write_bytes_to_process | reading from fd  (%02d) | writing to fd  (%02d)\n", pipes->in[stage->src][PIPE_READ], STDOUT_FILENO);
 #endif
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-result"
-    while ((bytes_read = read(pipes->in[stage->src][PIPE_READ], buffer, MAX_LINE_LENGTH_VALUE)) > 0) {
+    while ((bytes_read = read(pipes->out[stage->src][PIPE_READ], buffer, MAX_LINE_LENGTH_VALUE)) > 0) {
         write(STDOUT_FILENO, buffer, bytes_read);
     }
 #pragma GCC diagnostic pop
 
     pthread_exit(NULL);
+}
+
+inline static void
+c2b_debug_pipeset(c2b_pipeset *p, const size_t num)
+{
+    size_t n;
+    size_t s;
+
+    for (n = 0; n < num; n++) {
+        for (s = 0; s < PIPE_STREAMS; s++) {
+            fprintf(stderr, "\t--> c2b_debug_pipeset - [n, s] = [%zu, %zu] - [in, out, err] = [%d, %d, %d]\n",
+                    n, 
+                    s, 
+                    p->in[n][s],
+                    p->out[n][s],
+                    p->err[n][s]);
+        }
+    }
 }
 
 static void

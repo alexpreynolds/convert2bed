@@ -277,31 +277,32 @@ static const char *c2b_client_opt_string = "i:o:dakspvtnm:r:b:h?";
 extern "C" {
 #endif
 
-    static void       c2b_init_conversion(c2b_pipeset *p);
-    static void       c2b_init_bam_conversion(c2b_pipeset *p);
-    static void       c2b_line_convert_sam_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
-    static void *     c2b_read_bytes_from_stdin(void *arg);
-    static void *     c2b_process_intermediate_bytes_by_lines(void *arg);
-    static void *     c2b_write_bytes_to_process(void *arg);
-    static void *     c2b_write_bytes_to_stdout(void *arg);
-    static void       c2b_memrchr_offset(ssize_t *offset, char *buf, ssize_t buf_size, ssize_t len, char delim);
-    static void       c2b_init_pipeset(c2b_pipeset *p, const size_t num);
-    static void       c2b_delete_pipeset(c2b_pipeset *p);
-    static void       c2b_set_close_exec_flag(int fd);
-    static void       c2b_unset_close_exec_flag(int fd);
-    static int        c2b_pipe4(int fd[2], int flags);
-    static pid_t      c2b_popen4(const char* cmd, int pin[2], int pout[2], int perr[2], int flags);
-    static void       c2b_test_dependencies();
-    static boolean    c2b_print_matches(char *path, char *fn);
-    static char *     c2b_strsep(char **stringp, const char *delim);
-    static boolean    c2b_is_there(char *candidate);
-    static void       c2b_init_globals();
-    static void       c2b_delete_globals();
-    static void       c2b_init_command_line_options(int argc, char **argv);
-    static void       c2b_print_usage(FILE *stream);
-    static char *     c2b_to_lowercase(const char *src);
-    static c2b_format c2b_to_input_format(const char *input_format);
-    static c2b_format c2b_to_output_format(const char *output_format);
+    static void              c2b_init_conversion(c2b_pipeset *p);
+    static void              c2b_init_bam_conversion(c2b_pipeset *p);
+    static void              c2b_line_convert_sam_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
+    static void *            c2b_read_bytes_from_stdin(void *arg);
+    static void *            c2b_process_intermediate_bytes_by_lines(void *arg);
+    static void *            c2b_write_bytes_to_process(void *arg);
+    static void *            c2b_write_bytes_to_stdout(void *arg);
+    inline static void       c2b_debug_pipeset(c2b_pipeset *p, const size_t num);
+    static void              c2b_memrchr_offset(ssize_t *offset, char *buf, ssize_t buf_size, ssize_t len, char delim);
+    static void              c2b_init_pipeset(c2b_pipeset *p, const size_t num);
+    static void              c2b_delete_pipeset(c2b_pipeset *p);
+    static void              c2b_set_close_exec_flag(int fd);
+    static void              c2b_unset_close_exec_flag(int fd);
+    static int               c2b_pipe4(int fd[2], int flags);
+    static pid_t             c2b_popen4(const char* cmd, int pin[2], int pout[2], int perr[2], int flags);
+    static void              c2b_test_dependencies();
+    static boolean           c2b_print_matches(char *path, char *fn);
+    static char *            c2b_strsep(char **stringp, const char *delim);
+    static boolean           c2b_is_there(char *candidate);
+    static void              c2b_init_globals();
+    static void              c2b_delete_globals();
+    static void              c2b_init_command_line_options(int argc, char **argv);
+    static void              c2b_print_usage(FILE *stream);
+    static char *            c2b_to_lowercase(const char *src);
+    static c2b_format        c2b_to_input_format(const char *input_format);
+    static c2b_format        c2b_to_output_format(const char *output_format);
 
 #ifdef __cplusplus
 }
