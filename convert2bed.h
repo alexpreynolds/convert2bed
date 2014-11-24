@@ -55,6 +55,21 @@ const char *sortbed_tmpdir_arg = " --tmpdir ";
 extern const char *sortbed_stdin;
 const char *sortbed_stdin = " - ";
 
+extern const char *starch_bzip2_arg;
+const char *starch_bzip2_arg = " --bzip2 ";
+
+extern const char *starch_gzip_arg;
+const char *starch_gzip_arg = " --gzip ";
+
+extern const char *starch_note_prefix_arg;
+const char *starch_note_prefix_arg = " --note=\"";
+
+extern const char *starch_note_suffix_arg;
+const char *starch_note_suffix_arg = "\" ";
+
+extern const char *starch_stdin_arg;
+const char *starch_stdin_arg = " - ";
+
 typedef int boolean;
 extern const boolean kTrue;
 extern const boolean kFalse;
@@ -216,7 +231,7 @@ static const char *usage = "\n" \
     "      more than one file, or both may occur. With this option, every separate\n" \
     "      input goes to a separate output, starting with [basename].1, then\n" \
     "      [basename].2, and so on\n\n" \
-    "  Other process options:\n\n" \
+    "  Other processing options:\n\n" \
     "  --output=[bed|starch] | -o [bed|starch]\n" \
     "      Format of output file (optional, default is BED)\n" \
     "  --do-not-sort | -d\n" \
@@ -228,6 +243,14 @@ static const char *usage = "\n" \
     "      Optionally sets [dir] as temporary directory for sort data, when used in\n" \
     "      conjunction with --max-mem=[value], instead of the host's operating system\n" \
     "      default temporary directory\n" \
+    "  --starch-bzip2 | -z\n" \
+    "      Used with --output=starch, the compressed output explicitly applies the bzip2\n" \
+    "      algorithm to compress intermediate data (default is bzip2)\n" \
+    "  --starch-gzip | -g\n" \
+    "      Used with --output=starch, the compressed output applies gzip compression on\n" \
+    "      intermediate data\n" \
+    "  --starch-note=\"xyz...\" | -e\n" \
+    "      Used with --output=starch, this adds a note to the Starch archive metadata\n" \
     "  --help | -h\n" \
     "      Show help message\n";
 
@@ -247,6 +270,9 @@ static struct c2b_global_args_t {
     boolean vcf_snvs_flag;
     boolean vcf_insertions_flag;
     boolean vcf_deletions_flag;
+    boolean starch_bzip2_flag;
+    boolean starch_gzip_flag;
+    char *starch_note;
     char *max_mem_value;
     char *sort_tmpdir_path;
     char *wig_basename;
@@ -264,6 +290,9 @@ static struct option c2b_client_long_options[] = {
     { "snvs",           no_argument,         NULL,    'v' },
     { "insertions",     no_argument,         NULL,    't' },
     { "deletions",      no_argument,         NULL,    'n' },
+    { "starch-bzip2",   no_argument,         NULL,    'z' },
+    { "starch-gzip",    no_argument,         NULL,    'g' },
+    { "starch-note",    required_argument,   NULL,    'e' },
     { "max-mem",        required_argument,   NULL,    'm' },
     { "sort-tmpdir",    required_argument,   NULL,    'r' },
     { "basename",       required_argument,   NULL,    'b' },
@@ -271,7 +300,7 @@ static struct option c2b_client_long_options[] = {
     { NULL,             no_argument,         NULL,     0  }
 };
 
-static const char *c2b_client_opt_string = "i:o:dakspvtnm:r:b:h?";
+static const char *c2b_client_opt_string = "i:o:dakspvtnzge:m:r:b:h?";
 
 #ifdef __cplusplus
 extern "C" {
@@ -282,11 +311,13 @@ extern "C" {
     static void              c2b_line_convert_sam_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
     static void *            c2b_read_bytes_from_stdin(void *arg);
     static void *            c2b_process_intermediate_bytes_by_lines(void *arg);
-    static void *            c2b_write_bytes_to_process(void *arg);
-    static void *            c2b_write_bytes_to_stdout(void *arg);
-    inline static void       c2b_debug_pipeset(c2b_pipeset *p, const size_t num);
+    static void *            c2b_write_in_bytes_to_in_process(void *arg);
+    static void *            c2b_write_out_bytes_to_in_process(void *arg);
+    static void *            c2b_write_in_bytes_to_stdout(void *arg);
+    static void *            c2b_write_out_bytes_to_stdout(void *arg);
     static void              c2b_memrchr_offset(ssize_t *offset, char *buf, ssize_t buf_size, ssize_t len, char delim);
     static void              c2b_init_pipeset(c2b_pipeset *p, const size_t num);
+    static void              c2b_debug_pipeset(c2b_pipeset *p, const size_t num);
     static void              c2b_delete_pipeset(c2b_pipeset *p);
     static void              c2b_set_close_exec_flag(int fd);
     static void              c2b_unset_close_exec_flag(int fd);
