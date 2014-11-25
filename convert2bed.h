@@ -7,12 +7,14 @@
 #include <cgetopt>
 #include <cstring>
 #include <cassert>
+#include <cctype>
 #else
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
 #include <string.h>
 #include <assert.h>
+#include <ctype.h>
 #endif
 #include <unistd.h>
 #include <pthread.h>
@@ -23,9 +25,11 @@
 #define C2B_VERSION "1.0"
 
 #define MAX_FIELD_LENGTH_VALUE 1024
+#define MAX_OPERATION_FIELD_LENGTH_VALUE 24
 #define MAX_STRAND_LENGTH_VALUE 3
 #define MAX_LINE_LENGTH_VALUE 65536
 #define MAX_LINES_VALUE 128
+#define MAX_OPERATIONS_VALUE 128
 
 extern const char *c2b_samtools;
 const char *c2b_samtools = "samtools";
@@ -91,7 +95,30 @@ typedef enum format {
     VCF_FORMAT,
     WIG_FORMAT,
     UNDEFINED_FORMAT
-} c2b_format;
+} c2b_format_t;
+
+/* 
+   BAM/SAM CIGAR operations
+   
+   Allowed ops: \*|([0-9]+[MIDNSHPX=])+
+*/
+
+typedef struct cigar_op {
+    unsigned int bases;
+    char operation;
+} c2b_cigar_op_t;
+
+typedef struct cigar {
+    c2b_cigar_op_t *ops;
+    ssize_t size;
+    ssize_t length;
+} c2b_cigar_t;
+
+extern const unsigned int default_cigar_op_bases;
+const unsigned int default_cigar_op_bases = 0;
+
+extern const char default_cigar_op_operation;
+const char default_cigar_op_operation = '-';
 
 /* 
    At most, we need 4 pipes to handle the most complex conversion
@@ -161,14 +188,14 @@ typedef struct pipeset {
     int **out;
     int **err;
     size_t num;
-} c2b_pipeset;
+} c2b_pipeset_t;
 
 typedef struct pipeline_stage {
-    c2b_pipeset *pipeset;
+    c2b_pipeset_t *pipeset;
     void (*line_functor)();
     unsigned int src;
     unsigned int dest;
-} c2b_pipeline_stage;
+} c2b_pipeline_stage_t;
 
 #define PIPE4_FLAG_NONE       (0U)
 #define PIPE4_FLAG_RD_CLOEXEC (1U << 0)
@@ -254,11 +281,11 @@ static const char *usage = "\n" \
     "  --help | -h\n" \
     "      Show help message\n";
 
-static struct c2b_global_args_t {
+static struct globals {
     char *input_format;
-    c2b_format input_format_idx;
+    c2b_format_t input_format_idx;
     char *output_format;
-    c2b_format output_format_idx;
+    c2b_format_t output_format_idx;
     char *samtools_path;
     char *sortbed_path;
     char *starch_path;
@@ -277,7 +304,8 @@ static struct c2b_global_args_t {
     char *sort_tmpdir_path;
     char *wig_basename;
     unsigned int header_line_idx;
-} c2b_global_args;
+    c2b_cigar_t *cigar;
+} c2b_globals;
 
 static struct option c2b_client_long_options[] = {
     { "input",          required_argument,   NULL,    'i' },
@@ -306,9 +334,14 @@ static const char *c2b_client_opt_string = "i:o:dakspvtnzge:m:r:b:h?";
 extern "C" {
 #endif
 
-    static void              c2b_init_conversion(c2b_pipeset *p);
-    static void              c2b_init_bam_conversion(c2b_pipeset *p);
-    static void              c2b_line_convert_sam_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
+    static void              c2b_init_conversion(c2b_pipeset_t *p);
+    static void              c2b_init_bam_conversion(c2b_pipeset_t *p);
+    static void              c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
+    static void              c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *dest_size, char *src, ssize_t src_size); 
+    static void              c2b_cigar_str_to_ops(char *s);
+    static void              c2b_init_cigar_ops(c2b_cigar_t **c, const ssize_t size);
+    static void              c2b_debug_cigar_ops(c2b_cigar_t *c);
+    static void              c2b_delete_cigar_ops(c2b_cigar_t *c);
     static void *            c2b_read_bytes_from_stdin(void *arg);
     static void *            c2b_process_intermediate_bytes_by_lines(void *arg);
     static void *            c2b_write_in_bytes_to_in_process(void *arg);
@@ -316,9 +349,9 @@ extern "C" {
     static void *            c2b_write_in_bytes_to_stdout(void *arg);
     static void *            c2b_write_out_bytes_to_stdout(void *arg);
     static void              c2b_memrchr_offset(ssize_t *offset, char *buf, ssize_t buf_size, ssize_t len, char delim);
-    static void              c2b_init_pipeset(c2b_pipeset *p, const size_t num);
-    static void              c2b_debug_pipeset(c2b_pipeset *p, const size_t num);
-    static void              c2b_delete_pipeset(c2b_pipeset *p);
+    static void              c2b_init_pipeset(c2b_pipeset_t *p, const size_t num);
+    static void              c2b_debug_pipeset(c2b_pipeset_t *p, const size_t num);
+    static void              c2b_delete_pipeset(c2b_pipeset_t *p);
     static void              c2b_set_close_exec_flag(int fd);
     static void              c2b_unset_close_exec_flag(int fd);
     static int               c2b_pipe4(int fd[2], int flags);
@@ -332,8 +365,8 @@ extern "C" {
     static void              c2b_init_command_line_options(int argc, char **argv);
     static void              c2b_print_usage(FILE *stream);
     static char *            c2b_to_lowercase(const char *src);
-    static c2b_format        c2b_to_input_format(const char *input_format);
-    static c2b_format        c2b_to_output_format(const char *output_format);
+    static c2b_format_t      c2b_to_input_format(const char *input_format);
+    static c2b_format_t      c2b_to_output_format(const char *output_format);
 
 #ifdef __cplusplus
 }
