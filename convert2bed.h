@@ -8,6 +8,7 @@
 #include <cstring>
 #include <cassert>
 #include <cctype>
+#include <cinttypes>
 #else
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,6 +16,7 @@
 #include <string.h>
 #include <assert.h>
 #include <ctype.h>
+#include <inttypes.h>
 #endif
 #include <unistd.h>
 #include <pthread.h>
@@ -119,6 +121,27 @@ const unsigned int default_cigar_op_bases = 0;
 
 extern const char default_cigar_op_operation;
 const char default_cigar_op_operation = '-';
+
+/* 
+   SAM struct
+*/
+
+typedef struct sam {
+    char *rname;
+    unsigned long long int start;
+    unsigned long long int stop;
+    char *qname;
+    int flag;
+    char *strand;
+    char *mapq;
+    char *cigar;
+    char *rnext;
+    char *pnext;
+    char *tlen;
+    char *seq;
+    char *qual;
+    char *opt;
+} c2b_sam_t;
 
 /* 
    At most, we need 4 pipes to handle the most complex conversion
@@ -338,6 +361,7 @@ extern "C" {
     static void              c2b_init_bam_conversion(c2b_pipeset_t *p);
     static void              c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
     static void              c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *dest_size, char *src, ssize_t src_size); 
+    static void              c2b_sam_to_bed(c2b_sam_t s, char **dest, ssize_t **dest_size);
     static void              c2b_cigar_str_to_ops(char *s);
     static void              c2b_init_cigar_ops(c2b_cigar_t **c, const ssize_t size);
     static void              c2b_debug_cigar_ops(c2b_cigar_t *c);

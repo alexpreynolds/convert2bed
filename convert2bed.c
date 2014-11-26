@@ -614,7 +614,11 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
 #ifdef DEBUG
     c2b_debug_cigar_ops(c2b_globals.cigar);
 #endif
-
+    ssize_t cigar_length = 0;
+    ssize_t block_idx = 0;
+    for (block_idx = 0; block_idx < c2b_globals.cigar->length; ++block_idx) {
+        cigar_length += c2b_globals.cigar->ops[block_idx].bases;
+    }
     /* 
        Firstly, is the read mapped? If not, and c2b_globals.all_reads_flag is kFalse, we skip over this line
     */
@@ -631,10 +635,10 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
        Secondly, we need to retrieve RNAME, POS, QNAME parameters
     */
 
-    /* Field 1 - RNAME */
+    /* RNAME */
     char rname_str[MAX_FIELD_LENGTH_VALUE] = {0};
     if (is_mapped) {
-        ssize_t rname_size = sam_field_offsets[2] - sam_field_offsets[1];
+        ssize_t rname_size = sam_field_offsets[2] - sam_field_offsets[1] - 1;
         memcpy(rname_str, src + sam_field_offsets[1] + 1, rname_size);
     }
     else {
@@ -644,21 +648,115 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
         memcpy(rname_str, unmapped_read_chr_str, strlen(unmapped_read_chr_str));
     }
 
+    /* POS */
+    ssize_t pos_size = sam_field_offsets[3] - sam_field_offsets[2];
+    char pos_src_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    memcpy(pos_src_str, src + sam_field_offsets[2] + 1, pos_size - 1);
+    unsigned long long int pos_val = strtoull(pos_src_str, NULL, 10);
+    unsigned long long int start_val = pos_val - 1; /* remember, start = POS - 1 */
+    unsigned long long int stop_val = start_val + cigar_length;
+
+    /* QNAME */
+    char qname_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t qname_size = sam_field_offsets[0];
+    memcpy(qname_str, src, qname_size);
+
+    /* 16 & FLAG */
+    int strand_val = 0x10 & flag_val;
+    char strand_str[MAX_STRAND_LENGTH_VALUE] = {0};
+    sprintf(strand_str, "%c", (strand_val == 0x10) ? '-' : '+');
+    
+    /* MAPQ */
+    char mapq_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t mapq_size = sam_field_offsets[4] - sam_field_offsets[3] - 1;
+    memcpy(mapq_str, src + sam_field_offsets[3] + 1, mapq_size);
+    
+    /* RNEXT */
+    char rnext_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t rnext_size = sam_field_offsets[6] - sam_field_offsets[5] - 1;
+    memcpy(rnext_str, src + sam_field_offsets[5] + 1, rnext_size);
+
+    /* PNEXT */
+    char pnext_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t pnext_size = sam_field_offsets[7] - sam_field_offsets[6] - 1;
+    memcpy(pnext_str, src + sam_field_offsets[6] + 1, pnext_size);
+
+    /* TLEN */
+    char tlen_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t tlen_size = sam_field_offsets[8] - sam_field_offsets[7] - 1;
+    memcpy(tlen_str, src + sam_field_offsets[7] + 1, tlen_size);
+
+    /* SEQ */
+    char seq_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t seq_size = sam_field_offsets[9] - sam_field_offsets[8] - 1;
+    memcpy(seq_str, src + sam_field_offsets[8] + 1, seq_size);
+
+    /* QUAL */
+    char qual_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t qual_size = sam_field_offsets[10] - sam_field_offsets[9] - 1;
+    memcpy(qual_str, src + sam_field_offsets[9] + 1, qual_size);
+
+    /* Optional fields */
+    char opt_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    if (sam_field_offsets[11] != -1) {
+        for (int field_idx = 11; field_idx <= sam_field_idx; field_idx++) {
+            ssize_t opt_size = sam_field_offsets[field_idx] - sam_field_offsets[field_idx - 1] - (field_idx == sam_field_idx ? 1 : 0);
+            memcpy(opt_str + strlen(opt_str), src + sam_field_offsets[field_idx - 1] + 1, opt_size);
+        }
+    }
+
     /* 
        Loop through operations and process a line of input based on each operation and its associated value
     */
 
-    ssize_t block_idx = 0;
+    ssize_t op_idx;
     char previous_op = default_cigar_op_operation;
-    for (block_idx = 0; block_idx < c2b_globals.cigar->length; ++block_idx) {
-        char current_op = c2b_globals.cigar->ops[block_idx].operation;
+    char modified_qname_str[MAX_FIELD_LENGTH_VALUE];
+
+    c2b_sam_t sam;
+    sam.rname = rname_str;
+    sam.start = start_val;
+    sam.stop = stop_val;
+    sam.qname = qname_str;
+    sam.flag = flag_val;
+    sam.strand = strand_str;
+    sam.mapq = mapq_str;
+    sam.cigar = cigar_str;
+    sam.rnext = rnext_str;
+    sam.pnext = pnext_str;
+    sam.tlen = tlen_str;
+    sam.seq = seq_str;
+    sam.qual = qual_str;
+    sam.opt = opt_str;
+
+    for (op_idx = 0, block_idx = 0; op_idx < c2b_globals.cigar->length; ++op_idx) {
+        char current_op = c2b_globals.cigar->ops[op_idx].operation;
+        unsigned int bases = c2b_globals.cigar->ops[op_idx].bases;
         switch(current_op) 
             {
             case 'M':
+                stop_val = start_val + bases;
+                if ((previous_op == 'D') || (previous_op == 'N')) {
+                    sprintf(modified_qname_str, "%s/%zu", qname_str, block_idx++);
+                    sam.qname = modified_qname_str;
+                    c2b_sam_to_bed(sam, &dest, &dest_size);
+                    start_val = stop_val;
+                    sam.start = start_val;
+                }
                 break;
             case 'N':
+                sprintf(modified_qname_str, "%s/%zu", qname_str, block_idx++);
+                c2b_sam_to_bed(sam, &dest, &dest_size);
+                stop_val += bases;
+                start_val = stop_val;
+                sam.start = start_val;
+                sam.stop = stop_val;
                 break;
             case 'D':
+                stop_val += bases;
+                start_val = stop_val;
+                sam.start = start_val;
+                sam.stop = stop_val;
                 break;
             case 'H':
             case 'I':
@@ -668,7 +766,84 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
             default:
                 break;
             }
+        previous_op = current_op;
     }
+
+    /* 
+       If the CIGAR string does not contain a split or deletion operation ('N', 'D') then to 
+       quote Captain John O'Hagan, we don't enhance: we just print the damn thing
+    */
+
+    if (block_idx == 0) {
+        c2b_sam_to_bed(sam, &dest, &dest_size);
+    }
+}
+
+static void
+c2b_sam_to_bed(c2b_sam_t s, char **dest, ssize_t **dest_size)
+{
+    char dest_line_str[MAX_LINE_LENGTH_VALUE] = {0};
+    if (strlen(s.opt)) {
+        sprintf(dest_line_str,
+                "%s\t"                          \
+                "%" PRIu64 "\t"                 \
+                "%" PRIu64 "\t"                 \
+                "%s\t"                          \
+                "%d\t"                          \
+                "%s\t"                          \
+                "%s\t"                          \
+                "%s\t"                          \
+                "%s\t"                          \
+                "%s\t"                          \
+                "%s\t"                          \
+                "%s\t"                          \
+                "%s\t"                          \
+                "%s\n",
+                s.rname,
+                s.start,
+                s.stop,
+                s.qname,
+                s.flag,
+                s.strand,
+                s.mapq,
+                s.cigar,
+                s.rnext,
+                s.pnext,
+                s.tlen,
+                s.seq,
+                s.qual,
+                s.opt);
+    } 
+    else {
+        sprintf(dest_line_str,
+                "%s\t"                          \
+                "%" PRIu64 "\t"                 \
+                "%" PRIu64 "\t"                 \
+                "%s\t"                          \
+                "%s\t"                          \
+                "%s\t"                          \
+                "%s\t"                          \
+                "%s\t"                          \
+                "%s\t"                          \
+                "%s\t"                          \
+                "%s\t"                          \
+                "%s\n",
+                s.rname,
+                s.start,
+                s.stop,
+                s.qname,
+                s.strand,
+                s.mapq,
+                s.cigar,
+                s.rnext,
+                s.pnext,
+                s.tlen,
+                s.seq,
+                s.qual);
+    }
+    ssize_t dest_line_size = strlen(dest_line_str);
+    memcpy(*dest + **dest_size, dest_line_str, dest_line_size);
+    **dest_size += dest_line_size;
 }
 
 static void
