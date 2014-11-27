@@ -182,11 +182,11 @@ c2b_init_bam_conversion(c2b_pipeset_t *p)
 
 #pragma GCC diagnostic pop
 
-    c2b_cmd_sort_bed(bed_unsorted2bed_sorted_cmd);
-#ifdef DEBUG
-    fprintf(stderr, "Debug: c2b_cmd_sort_bed: [%s]\n", bed_unsorted2bed_sorted_cmd);
-#endif
     if (c2b_globals.sort_flag) {
+        c2b_cmd_sort_bed(bed_unsorted2bed_sorted_cmd);
+#ifdef DEBUG
+        fprintf(stderr, "Debug: c2b_cmd_sort_bed: [%s]\n", bed_unsorted2bed_sorted_cmd);
+#endif
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
