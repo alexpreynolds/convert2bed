@@ -83,7 +83,7 @@ const boolean kTrue = 1;
 const boolean kFalse = 0;
 
 /* 
-   Legal input and output formats
+   Allowed input and output formats
 */
 
 typedef enum format {
@@ -101,7 +101,7 @@ typedef enum format {
 
 /* 
    BAM/SAM CIGAR operations
-   
+   -------------------------------------------------------------------------
    Allowed ops: \*|([0-9]+[MIDNSHPX=])+
 */
 
@@ -164,60 +164,33 @@ typedef struct sam {
 
 /* 
    At most, we need 4 pipes to handle the most complex conversion
-   pipeline: 
+   pipeline within the BEDOPS suite: 
    
-   BAM -> Starch
-   -----------------------------------------------------------------
-   BAM -> SAM -> BED (unsorted) -> BED (sorted) -> Starch
+    BAM -> SAM -> BED (unsorted) -> BED (sorted) -> Starch
    
    Here, each arrow represents a unidirectional path between
    processing steps. 
    
-   Other possibilities are:
+   The other two possibilities are:
+     
+    BAM -> SAM -> BED (unsorted) -> BED (sorted)
+    BAM -> SAM -> BED (unsorted)
    
-   BAM -> BED (sorted), BED (unsorted)
-   -----------------------------------------------------------------
-   BAM -> SAM -> BED (unsorted) -> BED (sorted)
-   BAM -> SAM -> BED (unsorted)
-   
-   GFF -> Starch, BED (sorted), BED (unsorted)
-   -----------------------------------------------------------------
-   GFF -> BED (unsorted) -> BED (sorted) -> Starch
-   GFF -> BED (unsorted) -> BED (sorted)
-   GFF -> BED (unsorted)
-   
-   GTF -> Starch, BED (sorted), BED (unsorted)
-   -----------------------------------------------------------------
-   GTF -> BED (unsorted) -> BED (sorted) -> Starch
-   GTF -> BED (unsorted) -> BED (sorted)
-   GTF -> BED (unsorted)
-   
-   PSL -> Starch, BED (sorted), BED (unsorted)
-   -----------------------------------------------------------------
-   PSL -> BED (unsorted) -> BED (sorted) -> Starch
-   PSL -> BED (unsorted) -> BED (sorted)
-   PSL -> BED (unsorted)
-   
-   SAM -> Starch, BED (sorted), BED (unsorted)
-   -----------------------------------------------------------------
-   SAM -> BED (unsorted) -> BED (sorted) -> Starch
-   SAM -> BED (unsorted) -> BED (sorted)
-   SAM -> BED (unsorted)
-   
-   VCF -> Starch, BED (sorted), BED (unsorted)
-   -----------------------------------------------------------------
-   VCF -> BED (unsorted) -> BED (sorted) -> Starch
-   VCF -> BED (unsorted) -> BED (sorted)
-   VCF -> BED (unsorted)
-   
-   WIG -> Starch, BED (sorted), BED (unsorted)
-   -----------------------------------------------------------------
-   WIG -> BED (unsorted) -> BED (sorted) -> Starch
-   WIG -> BED (unsorted) -> BED (sorted)
-   WIG -> BED (unsorted)
+   More generically, other formats typically follow one of these 
+   three paths:
+
+    XYZ -> BED (unsorted) -> BED (sorted) -> Starch
+    XYZ -> BED (unsorted) -> BED (sorted)
+    XYZ -> BED (unsorted)
+
+   Here, XYZ is one of GFF, GTF, PSL, SAM, VCF, or WIG.
    
    If a more complex pipeline arises, we can just increase the value
    of MAX_PIPES.
+
+   Each pipe has a read and write stream. The write stream handles
+   data sent via the out and err file handles. We bundles all the pipes
+   into a "pipeset" for use at a processing stage, described below.
 */
 
 #define PIPE_READ 0
@@ -232,11 +205,19 @@ typedef struct pipeset {
     size_t num;
 } c2b_pipeset_t;
 
+/* 
+   A pipeline stage contains a pipeset (set of I/O pipes), source
+   and destination stage IDs, and a "line functor" which generally 
+   processes fields from a precursor format to BED. This functor is
+   specific to the specified input format. This stage is passed to 
+   each processing thread.
+*/
+
 typedef struct pipeline_stage {
     c2b_pipeset_t *pipeset;
-    void (*line_functor)();
     unsigned int src;
     unsigned int dest;
+    void (*line_functor)();
 } c2b_pipeline_stage_t;
 
 #define PIPE4_FLAG_NONE       (0U)
@@ -384,10 +365,10 @@ extern "C" {
     static void              c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
     static void              c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *dest_size, char *src, ssize_t src_size); 
     static inline void       c2b_line_convert_sam_to_bed(c2b_sam_t s, char *dest_line);
-    static void              c2b_cigar_str_to_ops(char *s);
-    static void              c2b_init_cigar_ops(c2b_cigar_t **c, const ssize_t size);
-    static void              c2b_debug_cigar_ops(c2b_cigar_t *c);
-    static void              c2b_delete_cigar_ops(c2b_cigar_t *c);
+    static void              c2b_sam_cigar_str_to_ops(char *s);
+    static void              c2b_sam_init_cigar_ops(c2b_cigar_t **c, const ssize_t size);
+    static void              c2b_sam_debug_cigar_ops(c2b_cigar_t *c);
+    static void              c2b_sam_delete_cigar_ops(c2b_cigar_t *c);
     static void *            c2b_read_bytes_from_stdin(void *arg);
     static void *            c2b_process_intermediate_bytes_by_lines(void *arg);
     static void *            c2b_write_in_bytes_to_in_process(void *arg);

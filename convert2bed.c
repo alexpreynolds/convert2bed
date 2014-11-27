@@ -492,7 +492,7 @@ c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t
     char stop_str[MAX_FIELD_LENGTH_VALUE] = {0};
     char cigar_str[MAX_FIELD_LENGTH_VALUE] = {0};
     memcpy(cigar_str, src + sam_field_offsets[4] + 1, cigar_size - 1);
-    c2b_cigar_str_to_ops(cigar_str);
+    c2b_sam_cigar_str_to_ops(cigar_str);
     ssize_t block_idx = 0;
     for (block_idx = 0; block_idx < c2b_globals.cigar->length; ++block_idx) {
         cigar_length += c2b_globals.cigar->ops[block_idx].bases;
@@ -614,9 +614,9 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
     ssize_t cigar_size = sam_field_offsets[5] - sam_field_offsets[4];
     char cigar_str[MAX_FIELD_LENGTH_VALUE] = {0};
     memcpy(cigar_str, src + sam_field_offsets[4] + 1, cigar_size - 1);
-    c2b_cigar_str_to_ops(cigar_str);
+    c2b_sam_cigar_str_to_ops(cigar_str);
 #ifdef DEBUG
-    c2b_debug_cigar_ops(c2b_globals.cigar);
+    c2b_sam_debug_cigar_ops(c2b_globals.cigar);
 #endif
     ssize_t cigar_length = 0;
     ssize_t op_idx = 0;
@@ -776,8 +776,9 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
     }
 
     /* 
-       If the CIGAR string does not contain a split or deletion operation ('N', 'D') then to 
-       quote Captain John O'Hagan, we don't enhance: we just print the damn thing
+       If the CIGAR string does not contain a split or deletion operation ('N', 'D') or the
+       operations are unavailable ('*') then to quote Captain John O'Hagan, we don't enhance: we 
+       just print the damn thing
     */
 
     if (block_idx == 1) {
@@ -886,7 +887,7 @@ c2b_line_convert_sam_to_bed(c2b_sam_t s, char *dest_line)
 }
 
 static void
-c2b_cigar_str_to_ops(char *s)
+c2b_sam_cigar_str_to_ops(char *s)
 {
     size_t s_idx;
     size_t s_len = strlen(s);
@@ -918,6 +919,9 @@ c2b_cigar_str_to_ops(char *s)
                 memset(curr_bases_field, 0, strlen(curr_bases_field));
             }
             c2b_globals.cigar->ops[op_idx].operation = curr_char;
+            if (curr_char == '*') {
+                break;
+            }
         }
     }
     c2b_globals.cigar->ops[op_idx].bases = curr_bases;
@@ -925,7 +929,7 @@ c2b_cigar_str_to_ops(char *s)
 }
 
 static void
-c2b_init_cigar_ops(c2b_cigar_t **c, const ssize_t size)
+c2b_sam_init_cigar_ops(c2b_cigar_t **c, const ssize_t size)
 {
     *c = malloc(sizeof(c2b_cigar_t));
     if (!*c) {
@@ -946,27 +950,27 @@ c2b_init_cigar_ops(c2b_cigar_t **c, const ssize_t size)
 }
 
 /* 
-   specifying special attribute for c2b_debug_cigar_ops() to avoid: "warning: unused 
-   function 'c2b_debug_cigar_ops' [-Wunused-function]" message during compilation
+   specifying special attribute for c2b_sam_debug_cigar_ops() to avoid: "warning: unused 
+   function 'c2b_sam_debug_cigar_ops' [-Wunused-function]" message during compilation
 
    cf. http://gcc.gnu.org/onlinedocs/gcc-3.4.1/gcc/Function-Attributes.html#Function%20Attributes
 */
 #if defined(__GNUC__)
-static void c2b_debug_cigar_ops() __attribute__ ((unused));
+static void c2b_sam_debug_cigar_ops() __attribute__ ((unused));
 #endif
 
 static void
-c2b_debug_cigar_ops(c2b_cigar_t *c)
+c2b_sam_debug_cigar_ops(c2b_cigar_t *c)
 {
     ssize_t idx = 0;
     ssize_t length = c->length;
     for (idx = 0; idx < length; ++idx) {
-        fprintf(stderr, "\t-> c2b_debug_cigar_ops - %zu [%03u, %c]\n", idx, c->ops[idx].bases, c->ops[idx].operation);
+        fprintf(stderr, "\t-> c2b_sam_debug_cigar_ops - %zu [%03u, %c]\n", idx, c->ops[idx].bases, c->ops[idx].operation);
     }
 }
 
 static void
-c2b_delete_cigar_ops(c2b_cigar_t *c)
+c2b_sam_delete_cigar_ops(c2b_cigar_t *c)
 {
     if (c) {
         free(c->ops), c->ops = NULL, c->length = 0, c->size = 0;
@@ -1702,7 +1706,7 @@ c2b_init_globals()
     c2b_globals.max_mem_value = NULL;
     c2b_globals.sort_tmpdir_path = NULL;
     c2b_globals.wig_basename = NULL;
-    c2b_globals.cigar = NULL, c2b_init_cigar_ops(&c2b_globals.cigar, MAX_OPERATIONS_VALUE);
+    c2b_globals.cigar = NULL, c2b_sam_init_cigar_ops(&c2b_globals.cigar, MAX_OPERATIONS_VALUE);
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_init_globals() - exit  ---\n");
@@ -1745,7 +1749,7 @@ c2b_delete_globals()
     if (c2b_globals.wig_basename)
         free(c2b_globals.wig_basename), c2b_globals.wig_basename = NULL;
     if (c2b_globals.cigar)
-        c2b_delete_cigar_ops(c2b_globals.cigar);
+        c2b_sam_delete_cigar_ops(c2b_globals.cigar);
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_delete_globals() - exit  ---\n");
