@@ -390,62 +390,6 @@ c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t
     }
     sam_field_offsets[sam_field_idx] = src_size;
 
-    /*
-       The SAM format is described at:
-
-       http://samtools.github.io/hts-specs/SAMv1.pdf
-
-       SAM fields are in the following ordering:
-
-       Index   SAM field
-       -------------------------------------------------------------------------
-       0       QNAME
-       1       FLAG
-       2       RNAME
-       3       POS
-       4       MAPQ
-       5       CIGAR
-       6       RNEXT
-       7       PNEXT
-       8       TLEN
-       9       SEQ
-       10      QUAL
-       11+     Optional alignment section fields (TAG:TYPE:VALUE)
-
-       For SAM-formatted data, we use the mapping provided by BEDOPS convention described at: 
-
-       http://bedops.readthedocs.org/en/latest/content/reference/file-management/conversion/sam2bed.html
-
-       SAM field                 BED column index       BED field
-       -------------------------------------------------------------------------
-       RNAME                     1                      chromosome
-       POS - 1                   2                      start
-       POS + length(CIGAR) - 1   3                      stop
-       QNAME                     4                      id
-       FLAG                      5                      score
-       16 & FLAG                 6                      strand
-
-       If NOT (4 & FLAG) is true, then the read is mapped.
-
-       The remaining SAM columns are mapped as-is, in same order, to adjacent BED columns:
-
-       SAM field                 BED column index       BED field
-       -------------------------------------------------------------------------
-       MAPQ                      7                      -
-       CIGAR                     8                      -
-       RNEXT                     9                      -
-       PNEXT                     10                     -
-       TLEN                      11                     -
-       SEQ                       12                     -
-       QUAL                      13                     -
-
-       If present:
-
-       SAM field                 BED column index       BED field
-       -------------------------------------------------------------------------
-       Alignment fields          14+                    -
-    */
-
     /* 
        Firstly, is read mapped? If not, and c2b_globals.all_reads_flag is kFalse, we skip over this line
     */
@@ -565,7 +509,7 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
     /* 
        This functor is slightly more complex than c2b_line_convert_sam_to_bed_unsorted_without_split_operation() 
        as we need to build a list of tab delimiters, as before, but first read in the CIGAR string (6th field) and
-       parse it for operation key-value pairs
+       parse it for operation key-value pairs to loop through later on
     */
 
     ssize_t sam_field_offsets[MAX_FIELD_LENGTH_VALUE] = {-1};
@@ -741,8 +685,6 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
                 if ((previous_op == default_cigar_op_operation) || (previous_op == 'D') || (previous_op == 'N')) {
                     sprintf(modified_qname_str, "%s/%zu", qname_str, block_idx++);
                     sam.qname = modified_qname_str;
-                    if (sam.stop <= sam.start)
-                        fprintf(stderr, "M-fail\n"), exit(EXIT_FAILURE);
                     c2b_sam_to_bed(sam, dest_line_str);
                     memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
                     *dest_size += strlen(dest_line_str);
@@ -752,8 +694,6 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
             case 'N':
                 sprintf(modified_qname_str, "%s/%zu", qname_str, block_idx++);
                 sam.qname = modified_qname_str;
-                if (sam.stop <= sam.start)
-                    fprintf(stderr, "N-fail\n"), exit(EXIT_FAILURE);
                 c2b_sam_to_bed(sam, dest_line_str);
                 memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
                 *dest_size += strlen(dest_line_str);
@@ -781,8 +721,6 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
     */
 
     if (block_idx == 1) {
-        if (sam.stop <= sam.start)
-            fprintf(stderr, "1-fail\n"), exit(EXIT_FAILURE);
         c2b_sam_to_bed(sam, dest_line_str);
         memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
         *dest_size += strlen(dest_line_str);
@@ -792,6 +730,41 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
 static inline void
 c2b_sam_to_bed(c2b_sam_t s, char *dest_line)
 {
+    /*
+       For SAM-formatted data, we use the mapping provided by BEDOPS convention described at: 
+
+       http://bedops.readthedocs.org/en/latest/content/reference/file-management/conversion/sam2bed.html
+
+       SAM field                 BED column index       BED field
+       -------------------------------------------------------------------------
+       RNAME                     1                      chromosome
+       POS - 1                   2                      start
+       POS + length(CIGAR) - 1   3                      stop
+       QNAME                     4                      id
+       FLAG                      5                      score
+       16 & FLAG                 6                      strand
+
+       If NOT (4 & FLAG) is true, then the read is mapped.
+
+       The remaining SAM columns are mapped as-is, in same order, to adjacent BED columns:
+
+       SAM field                 BED column index       BED field
+       -------------------------------------------------------------------------
+       MAPQ                      7                      -
+       CIGAR                     8                      -
+       RNEXT                     9                      -
+       PNEXT                     10                     -
+       TLEN                      11                     -
+       SEQ                       12                     -
+       QUAL                      13                     -
+
+       If present:
+
+       SAM field                 BED column index       BED field
+       -------------------------------------------------------------------------
+       Alignment fields          14+                    -
+    */
+
     if (strlen(s.opt)) {
         sprintf(dest_line,
                 "%s\t"                          \

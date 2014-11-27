@@ -123,7 +123,26 @@ extern const char default_cigar_op_operation;
 const char default_cigar_op_operation = '-';
 
 /* 
-   SAM struct
+   The SAM format is described at:
+   
+   http://samtools.github.io/hts-specs/SAMv1.pdf
+   
+   SAM fields are in the following ordering:
+   
+   Index   SAM field
+   -------------------------------------------------------------------------
+   0       QNAME
+   1       FLAG
+   2       RNAME
+   3       POS
+   4       MAPQ
+   5       CIGAR
+   6       RNEXT
+   7       PNEXT
+   8       TLEN
+   9       SEQ
+   10      QUAL
+   11+     Optional alignment section fields (TAG:TYPE:VALUE)
 */
 
 typedef struct sam {
