@@ -35,8 +35,8 @@
 
 extern const char *c2b_samtools;
 const char *c2b_samtools = "samtools";
-extern const char *c2b_sortbed;
-const char *c2b_sortbed = "sort-bed";
+extern const char *c2b_sort_bed;
+const char *c2b_sort_bed = "sort-bed";
 extern const char *c2b_starch;
 const char *c2b_starch = "starch";
 
@@ -49,17 +49,17 @@ const char *c2b_unmapped_read_chr_name = "_unmapped";
 extern const char *c2b_header_chr_name;
 const char *c2b_header_chr_name = "_header";
 
-extern const char *sortbed_maxmem_arg;
-const char *sortbed_maxmem_arg = " --max-mem ";
+extern const char *sort_bed_max_mem_arg;
+const char *sort_bed_max_mem_arg = " --max-mem ";
 
-extern const char *sortbed_maxmem_default_arg;
-const char *sortbed_maxmem_default_arg = " --max-mem 2G ";
+extern const char *sort_bed_max_mem_default_arg;
+const char *sort_bed_max_mem_default_arg = " --max-mem 2G ";
 
-extern const char *sortbed_tmpdir_arg;
-const char *sortbed_tmpdir_arg = " --tmpdir ";
+extern const char *sort_bed_tmpdir_arg;
+const char *sort_bed_tmpdir_arg = " --tmpdir ";
 
-extern const char *sortbed_stdin;
-const char *sortbed_stdin = " - ";
+extern const char *sort_bed_stdin;
+const char *sort_bed_stdin = " - ";
 
 extern const char *starch_bzip2_arg;
 const char *starch_bzip2_arg = " --bzip2 ";
@@ -329,7 +329,7 @@ static struct globals {
     char *output_format;
     c2b_format_t output_format_idx;
     char *samtools_path;
-    char *sortbed_path;
+    char *sort_bed_path;
     char *starch_path;
     boolean sort_flag;
     boolean all_reads_flag;
@@ -378,9 +378,12 @@ extern "C" {
 
     static void              c2b_init_conversion(c2b_pipeset_t *p);
     static void              c2b_init_bam_conversion(c2b_pipeset_t *p);
+    static inline void       c2b_cmd_bam_to_sam(char *cmd);
+    static inline void       c2b_cmd_sort_bed(char *cmd);
+    static inline void       c2b_cmd_starch_bed(char *cmd);
     static void              c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
     static void              c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *dest_size, char *src, ssize_t src_size); 
-    static inline void       c2b_sam_to_bed(c2b_sam_t s, char *dest_line);
+    static inline void       c2b_line_convert_sam_to_bed(c2b_sam_t s, char *dest_line);
     static void              c2b_cigar_str_to_ops(char *s);
     static void              c2b_init_cigar_ops(c2b_cigar_t **c, const ssize_t size);
     static void              c2b_debug_cigar_ops(c2b_cigar_t *c);
