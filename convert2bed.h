@@ -26,12 +26,12 @@
 
 #define C2B_VERSION "1.0"
 
-#define MAX_FIELD_LENGTH_VALUE 1024
+#define MAX_FIELD_LENGTH_VALUE 2048
 #define MAX_OPERATION_FIELD_LENGTH_VALUE 24
 #define MAX_STRAND_LENGTH_VALUE 3
-#define MAX_LINE_LENGTH_VALUE 65536
-#define MAX_LINES_VALUE 128
-#define MAX_OPERATIONS_VALUE 128
+#define MAX_LINE_LENGTH_VALUE 4096
+#define MAX_LINES_VALUE 64
+#define MAX_OPERATIONS_VALUE 64
 
 extern const char *c2b_samtools;
 const char *c2b_samtools = "samtools";
@@ -361,7 +361,7 @@ extern "C" {
     static void              c2b_init_bam_conversion(c2b_pipeset_t *p);
     static void              c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
     static void              c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *dest_size, char *src, ssize_t src_size); 
-    static void              c2b_sam_to_bed(c2b_sam_t s, char **dest, ssize_t **dest_size);
+    static inline void       c2b_sam_to_bed(c2b_sam_t s, char *dest_line);
     static void              c2b_cigar_str_to_ops(char *s);
     static void              c2b_init_cigar_ops(c2b_cigar_t **c, const ssize_t size);
     static void              c2b_debug_cigar_ops(c2b_cigar_t *c);

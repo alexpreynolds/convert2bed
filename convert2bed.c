@@ -46,7 +46,7 @@ c2b_init_conversion(c2b_pipeset_t *p)
     if (c2b_globals.input_format_idx == BAM_FORMAT)
         c2b_init_bam_conversion(p);
     else {
-        fprintf(stderr, "Error: Unsupported format\n");
+        fprintf(stderr, "Error: Currently unsupported format\n");
         exit(EXIT_FAILURE);
     }
 }
@@ -615,9 +615,9 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
     c2b_debug_cigar_ops(c2b_globals.cigar);
 #endif
     ssize_t cigar_length = 0;
-    ssize_t block_idx = 0;
-    for (block_idx = 0; block_idx < c2b_globals.cigar->length; ++block_idx) {
-        cigar_length += c2b_globals.cigar->ops[block_idx].bases;
+    ssize_t op_idx = 0;
+    for (op_idx = 0; op_idx < c2b_globals.cigar->length; ++op_idx) {
+        cigar_length += c2b_globals.cigar->ops[op_idx].bases;
     }
     /* 
        Firstly, is the read mapped? If not, and c2b_globals.all_reads_flag is kFalse, we skip over this line
@@ -709,14 +709,14 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
        Loop through operations and process a line of input based on each operation and its associated value
     */
 
-    ssize_t op_idx;
+    ssize_t block_idx;
     char previous_op = default_cigar_op_operation;
     char modified_qname_str[MAX_FIELD_LENGTH_VALUE];
 
     c2b_sam_t sam;
     sam.rname = rname_str;
     sam.start = start_val;
-    sam.stop = stop_val;
+    sam.stop = start_val;
     sam.qname = qname_str;
     sam.flag = flag_val;
     sam.strand = strand_str;
@@ -729,34 +729,40 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
     sam.qual = qual_str;
     sam.opt = opt_str;
 
-    for (op_idx = 0, block_idx = 0; op_idx < c2b_globals.cigar->length; ++op_idx) {
+    char dest_line_str[MAX_LINE_LENGTH_VALUE] = {0};
+    
+    for (op_idx = 0, block_idx = 1; op_idx < c2b_globals.cigar->length; ++op_idx) {
         char current_op = c2b_globals.cigar->ops[op_idx].operation;
         unsigned int bases = c2b_globals.cigar->ops[op_idx].bases;
-        switch(current_op) 
+        switch (current_op) 
             {
             case 'M':
-                stop_val = start_val + bases;
-                if ((previous_op == 'D') || (previous_op == 'N')) {
+                sam.stop += bases;
+                if ((previous_op == default_cigar_op_operation) || (previous_op == 'D') || (previous_op == 'N')) {
                     sprintf(modified_qname_str, "%s/%zu", qname_str, block_idx++);
                     sam.qname = modified_qname_str;
-                    c2b_sam_to_bed(sam, &dest, &dest_size);
-                    start_val = stop_val;
-                    sam.start = start_val;
+                    if (sam.stop <= sam.start)
+                        fprintf(stderr, "M-fail\n"), exit(EXIT_FAILURE);
+                    c2b_sam_to_bed(sam, dest_line_str);
+                    memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
+                    *dest_size += strlen(dest_line_str);
+                    sam.start = stop_val;
                 }
                 break;
             case 'N':
                 sprintf(modified_qname_str, "%s/%zu", qname_str, block_idx++);
-                c2b_sam_to_bed(sam, &dest, &dest_size);
-                stop_val += bases;
-                start_val = stop_val;
-                sam.start = start_val;
-                sam.stop = stop_val;
+                sam.qname = modified_qname_str;
+                if (sam.stop <= sam.start)
+                    fprintf(stderr, "N-fail\n"), exit(EXIT_FAILURE);
+                c2b_sam_to_bed(sam, dest_line_str);
+                memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
+                *dest_size += strlen(dest_line_str);
+                sam.stop += bases;
+                sam.start = sam.stop;
                 break;
             case 'D':
-                stop_val += bases;
-                start_val = stop_val;
-                sam.start = start_val;
-                sam.stop = stop_val;
+                sam.stop += bases;
+                sam.start = sam.stop;
                 break;
             case 'H':
             case 'I':
@@ -774,17 +780,20 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
        quote Captain John O'Hagan, we don't enhance: we just print the damn thing
     */
 
-    if (block_idx == 0) {
-        c2b_sam_to_bed(sam, &dest, &dest_size);
+    if (block_idx == 1) {
+        if (sam.stop <= sam.start)
+            fprintf(stderr, "1-fail\n"), exit(EXIT_FAILURE);
+        c2b_sam_to_bed(sam, dest_line_str);
+        memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
+        *dest_size += strlen(dest_line_str);
     }
 }
 
-static void
-c2b_sam_to_bed(c2b_sam_t s, char **dest, ssize_t **dest_size)
+static inline void
+c2b_sam_to_bed(c2b_sam_t s, char *dest_line)
 {
-    char dest_line_str[MAX_LINE_LENGTH_VALUE] = {0};
     if (strlen(s.opt)) {
-        sprintf(dest_line_str,
+        sprintf(dest_line,
                 "%s\t"                          \
                 "%" PRIu64 "\t"                 \
                 "%" PRIu64 "\t"                 \
@@ -815,7 +824,7 @@ c2b_sam_to_bed(c2b_sam_t s, char **dest, ssize_t **dest_size)
                 s.opt);
     } 
     else {
-        sprintf(dest_line_str,
+        sprintf(dest_line,
                 "%s\t"                          \
                 "%" PRIu64 "\t"                 \
                 "%" PRIu64 "\t"                 \
@@ -841,9 +850,6 @@ c2b_sam_to_bed(c2b_sam_t s, char **dest, ssize_t **dest_size)
                 s.seq,
                 s.qual);
     }
-    ssize_t dest_line_size = strlen(dest_line_str);
-    memcpy(*dest + **dest_size, dest_line_str, dest_line_size);
-    **dest_size += dest_line_size;
 }
 
 static void
@@ -1051,9 +1057,6 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
 
            Second and subsequent reads should reduce the maximum number of src_bytes_read from 
            src_buffer_size to something smaller.
-
-           Note: We should look into doing a final pass through the line_functor, once we grab the 
-           last buffer, after the last read().
         */
 
         c2b_memrchr_offset(&remainder_offset, src_buffer, src_buffer_size, src_bytes_read + remainder_length, line_delim);
