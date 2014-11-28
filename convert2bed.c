@@ -1019,9 +1019,6 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
     ssize_t dest_buffer_size = MAX_LINE_LENGTH_VALUE * MAX_LINES_VALUE;
     ssize_t dest_bytes_written = 0;
     void (*line_functor)(char *, ssize_t *, char *, ssize_t) = stage->line_functor;
-    ssize_t err_bytes_read = 0;
-    ssize_t err_buffer_size = MAX_LINE_LENGTH_VALUE;
-    char *err_buffer = NULL;
 
 #ifdef DEBUG
     fprintf(stderr, "\t-> c2b_process_intermediate_bytes_by_lines | reading from fd  (%02d) | writing to fd  (%02d)\n", pipes->out[stage->src][PIPE_READ], pipes->in[stage->dest][PIPE_WRITE]);
@@ -1042,20 +1039,6 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
         fprintf(stderr, "Error: Could not allocate space for intermediate destination buffer.\n");
         exit(EXIT_FAILURE);
     }
-
-    err_bytes_read = 0;
-    err_buffer = malloc(err_buffer_size);
-    if (!err_buffer) {
-        fprintf(stderr, "Error: Could not allocate space for intermediate error buffer.\n");
-        exit(EXIT_FAILURE);
-    }
-    err_bytes_read = read(pipes->err[stage->src][PIPE_READ],
-                          err_buffer,
-                          err_buffer_size);
-    if (err_bytes_read > 0)
-        write(STDERR_FILENO, err_buffer, err_bytes_read);
-    free(err_buffer);
-    err_buffer = NULL;
 
     while ((src_bytes_read = read(pipes->out[stage->src][PIPE_READ],
                                   src_buffer + remainder_length,
@@ -1315,6 +1298,9 @@ c2b_init_pipeset(c2b_pipeset_t *p, const size_t num)
 	c2b_pipe4_cloexec(p->in[n]);
 	c2b_pipe4_cloexec(p->out[n]);
 	c2b_pipe4_cloexec(p->err[n]);
+
+        /* set stderr as output for each err write */
+        p->err[n][PIPE_WRITE] = fileno(stderr);
     }
 
     p->num = num;
