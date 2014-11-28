@@ -1019,6 +1019,9 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
     ssize_t dest_buffer_size = MAX_LINE_LENGTH_VALUE * MAX_LINES_VALUE;
     ssize_t dest_bytes_written = 0;
     void (*line_functor)(char *, ssize_t *, char *, ssize_t) = stage->line_functor;
+    ssize_t err_bytes_read = 0;
+    ssize_t err_buffer_size = MAX_LINE_LENGTH_VALUE;
+    char *err_buffer = NULL;
 
 #ifdef DEBUG
     fprintf(stderr, "\t-> c2b_process_intermediate_bytes_by_lines | reading from fd  (%02d) | writing to fd  (%02d)\n", pipes->out[stage->src][PIPE_READ], pipes->in[stage->dest][PIPE_WRITE]);
@@ -1040,10 +1043,24 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
         exit(EXIT_FAILURE);
     }
 
-    while ((src_bytes_read = read(pipes->out[stage->src][PIPE_READ],
-				  src_buffer + remainder_length,
-				  src_buffer_size - remainder_length)) > 0) {
+    err_bytes_read = 0;
+    err_buffer = malloc(err_buffer_size);
+    if (!err_buffer) {
+        fprintf(stderr, "Error: Could not allocate space for intermediate error buffer.\n");
+        exit(EXIT_FAILURE);
+    }
+    err_bytes_read = read(pipes->err[stage->src][PIPE_READ],
+                          err_buffer,
+                          err_buffer_size);
+    if (err_bytes_read > 0)
+        write(STDERR_FILENO, err_buffer, err_bytes_read);
+    free(err_buffer);
+    err_buffer = NULL;
 
+    while ((src_bytes_read = read(pipes->out[stage->src][PIPE_READ],
+                                  src_buffer + remainder_length,
+                                  src_buffer_size - remainder_length)) > 0) {
+        
         /* 
            So here's what src_buffer looks like initially; basically, some stuff separated by
            newlines. The src_buffer will probably not terminate with a newline. So we first use 
@@ -1158,10 +1175,6 @@ c2b_write_in_bytes_to_in_process(void *arg)
     char buffer[MAX_LINE_LENGTH_VALUE];
     ssize_t bytes_read;
 
-#ifdef DEBUG
-    fprintf(stderr, "\t-> c2b_write_in_bytes_to_in_process | reading from fd  (%02d) | writing to fd  (%02d)\n", pipes->in[stage->src][PIPE_READ], pipes->in[stage->dest][PIPE_WRITE]);
-#endif
-
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-result"
     /* read buffer from p->in[1] and write buffer to p->in[2] */
@@ -1183,10 +1196,6 @@ c2b_write_out_bytes_to_in_process(void *arg)
     char buffer[MAX_LINE_LENGTH_VALUE];
     ssize_t bytes_read;
 
-#ifdef DEBUG
-    fprintf(stderr, "\t-> c2b_write_out_bytes_to_in_process | reading from fd  (%02d) | writing to fd  (%02d)\n", pipes->out[stage->src][PIPE_READ], pipes->out[stage->dest][PIPE_WRITE]);
-#endif
-
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-result"
     /* read buffer from p->out[1] and write buffer to p->in[2] */
@@ -1207,10 +1216,6 @@ c2b_write_in_bytes_to_stdout(void *arg)
     c2b_pipeset_t *pipes = stage->pipeset;
     char buffer[MAX_LINE_LENGTH_VALUE];
     ssize_t bytes_read;
-
-#ifdef DEBUG
-    fprintf(stderr, "\t-> c2b_write_in_bytes_to_stdout | reading from fd  (%02d) | writing to fd  (%02d)\n", pipes->in[stage->src][PIPE_READ], STDOUT_FILENO);
-#endif
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-result"
