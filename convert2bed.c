@@ -53,6 +53,9 @@ c2b_init_conversion(c2b_pipeset_t *p)
         case BAM_FORMAT:
             c2b_init_bam_conversion(p);
             break;
+        case GFF_FORMAT:
+            c2b_init_gff_conversion(p);
+            break;
         case SAM_FORMAT:
             c2b_init_sam_conversion(p);
             break;
@@ -64,6 +67,487 @@ c2b_init_conversion(c2b_pipeset_t *p)
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_init_conversion() - exit  ---\n");
+#endif
+}
+
+static void
+c2b_init_bam_conversion(c2b_pipeset_t *p)
+{
+#ifdef DEBUG
+    fprintf(stderr, "--- c2b_init_bam_conversion() - enter ---\n");
+#endif
+
+    pthread_t bam2sam_thread; 
+    pthread_t sam2bed_unsorted_thread; 
+    pthread_t bed_unsorted2stdout_thread;
+    pthread_t bed_unsorted2bed_sorted_thread;
+    pthread_t bed_sorted2stdout_thread;
+    pthread_t bed_sorted2starch_thread;
+    pthread_t starch2stdout_thread;
+    pid_t bam2sam_proc;
+    pid_t bed_unsorted2bed_sorted_proc;
+    pid_t bed_sorted2starch_proc;
+    c2b_pipeline_stage_t bam2sam_stage;
+    c2b_pipeline_stage_t sam2bed_unsorted_stage;
+    c2b_pipeline_stage_t bed_unsorted2stdout_stage;
+    c2b_pipeline_stage_t bed_unsorted2bed_sorted_stage;
+    c2b_pipeline_stage_t bed_sorted2stdout_stage;
+    c2b_pipeline_stage_t bed_sorted2starch_stage;
+    c2b_pipeline_stage_t starch2stdout_stage;
+    char bam2sam_cmd[MAX_LINE_LENGTH_VALUE] = {0};
+    char bed_unsorted2bed_sorted_cmd[MAX_LINE_LENGTH_VALUE] = {0};
+    char bed_sorted2starch_cmd[MAX_LINE_LENGTH_VALUE] = {0};
+    void (*sam2bed_unsorted_line_functor)(char *, ssize_t *, char *, ssize_t) = NULL;
+
+    sam2bed_unsorted_line_functor = (!c2b_globals.split_flag ?
+                                     c2b_line_convert_sam_to_bed_unsorted_without_split_operation :
+                                     c2b_line_convert_sam_to_bed_unsorted_with_split_operation);
+
+    if ((!c2b_globals.sort_flag) && (c2b_globals.output_format_idx == BED_FORMAT)) {
+        bam2sam_stage.pipeset = p;
+        bam2sam_stage.line_functor = NULL;
+        bam2sam_stage.src = -1; /* src is really stdin */
+        bam2sam_stage.dest = 0;
+        
+        sam2bed_unsorted_stage.pipeset = p;
+        sam2bed_unsorted_stage.line_functor = sam2bed_unsorted_line_functor;
+        sam2bed_unsorted_stage.src = 0;
+        sam2bed_unsorted_stage.dest = 1;
+
+        bed_unsorted2stdout_stage.pipeset = p;
+        bed_unsorted2stdout_stage.line_functor = NULL;
+        bed_unsorted2stdout_stage.src = 1;
+        bed_unsorted2stdout_stage.dest = -1; /* dest BED is stdout */
+    }
+    else if (c2b_globals.output_format_idx == BED_FORMAT) {
+        bam2sam_stage.pipeset = p;
+        bam2sam_stage.line_functor = NULL;
+        bam2sam_stage.src = -1; /* src is really stdin */
+        bam2sam_stage.dest = 0;
+        
+        sam2bed_unsorted_stage.pipeset = p;
+        sam2bed_unsorted_stage.line_functor = sam2bed_unsorted_line_functor;
+        sam2bed_unsorted_stage.src = 0;
+        sam2bed_unsorted_stage.dest = 1;
+        
+        bed_unsorted2bed_sorted_stage.pipeset = p;
+        bed_unsorted2bed_sorted_stage.line_functor = NULL;
+        bed_unsorted2bed_sorted_stage.src = 1;
+        bed_unsorted2bed_sorted_stage.dest = 2;
+
+        bed_sorted2stdout_stage.pipeset = p;
+        bed_sorted2stdout_stage.line_functor = NULL;
+        bed_sorted2stdout_stage.src = 2;
+        bed_sorted2stdout_stage.dest = -1; /* dest BED is stdout */
+    }
+    else if (c2b_globals.output_format_idx == STARCH_FORMAT) {
+        bam2sam_stage.pipeset = p;
+        bam2sam_stage.line_functor = NULL;
+        bam2sam_stage.src = -1; /* src is really stdin */
+        bam2sam_stage.dest = 0;
+        
+        sam2bed_unsorted_stage.pipeset = p;
+        sam2bed_unsorted_stage.line_functor = sam2bed_unsorted_line_functor;
+        sam2bed_unsorted_stage.src = 0;
+        sam2bed_unsorted_stage.dest = 1;
+
+        bed_unsorted2bed_sorted_stage.pipeset = p;
+        bed_unsorted2bed_sorted_stage.line_functor = NULL;
+        bed_unsorted2bed_sorted_stage.src = 1;
+        bed_unsorted2bed_sorted_stage.dest = 2;
+
+        bed_sorted2starch_stage.pipeset = p;
+        bed_sorted2starch_stage.line_functor = NULL;
+        bed_sorted2starch_stage.src = 2;
+        bed_sorted2starch_stage.dest = 3;
+
+        starch2stdout_stage.pipeset = p;
+        starch2stdout_stage.line_functor = NULL;
+        starch2stdout_stage.src = 3;
+        starch2stdout_stage.dest = -1; /* dest Starch is stdout */
+    }
+    else {
+        fprintf(stderr, "Error: Unknown BAM conversion parameter combination\n");
+        c2b_print_usage(stderr);
+        exit(EXIT_FAILURE);
+    }
+
+    /*
+       We open pid_t (process) instances to handle data in a specified order. 
+    */
+
+    c2b_cmd_bam_to_sam(bam2sam_cmd);
+#ifdef DEBUG
+    fprintf(stderr, "Debug: c2b_cmd_bam_to_sam: [%s]\n", bam2sam_cmd);
+#endif
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+    bam2sam_proc = c2b_popen4(bam2sam_cmd,
+			      p->in[0],
+			      p->out[0],
+			      p->err[0],
+			      POPEN4_FLAG_NONE);
+
+#pragma GCC diagnostic pop
+
+    if (c2b_globals.sort_flag) {
+        c2b_cmd_sort_bed(bed_unsorted2bed_sorted_cmd);
+#ifdef DEBUG
+        fprintf(stderr, "Debug: c2b_cmd_sort_bed: [%s]\n", bed_unsorted2bed_sorted_cmd);
+#endif
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+        bed_unsorted2bed_sorted_proc = c2b_popen4(bed_unsorted2bed_sorted_cmd,
+                                                  p->in[2],
+                                                  p->out[2],
+                                                  p->err[2],
+                                                  POPEN4_FLAG_NONE);
+#pragma GCC diagnostic pop
+    }
+
+    if (c2b_globals.output_format_idx == STARCH_FORMAT) {
+        c2b_cmd_starch_bed(bed_sorted2starch_cmd);
+#ifdef DEBUG
+        fprintf(stderr, "Debug: c2b_cmd_starch_bed: [%s]\n", bed_sorted2starch_cmd);
+#endif
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+        bed_sorted2starch_proc = c2b_popen4(bed_sorted2starch_cmd,
+                                            p->in[3],
+                                            p->out[3],
+                                            p->err[3],
+                                            POPEN4_FLAG_NONE);
+#pragma GCC diagnostic pop
+    }
+
+#ifdef DEBUG
+    c2b_debug_pipeset(p, MAX_PIPES);
+#endif
+
+    /*
+       Once we have the desired process instances, we create and join
+       threads for their ordered execution.
+    */
+
+    if ((!c2b_globals.sort_flag) && (c2b_globals.output_format_idx == BED_FORMAT)) {
+        pthread_create(&bam2sam_thread,
+                       NULL,
+                       c2b_read_bytes_from_stdin,
+                       &bam2sam_stage);
+        pthread_create(&sam2bed_unsorted_thread,
+                       NULL,
+                       c2b_process_intermediate_bytes_by_lines,
+                       &sam2bed_unsorted_stage);
+        pthread_create(&bed_unsorted2stdout_thread,
+                       NULL,
+                       c2b_write_in_bytes_to_stdout,
+                       &bed_unsorted2stdout_stage);
+    }
+    else if (c2b_globals.output_format_idx == BED_FORMAT) {
+        pthread_create(&bam2sam_thread,
+                       NULL,
+                       c2b_read_bytes_from_stdin,
+                       &bam2sam_stage);
+        pthread_create(&sam2bed_unsorted_thread,
+                       NULL,
+                       c2b_process_intermediate_bytes_by_lines,
+                       &sam2bed_unsorted_stage);
+        pthread_create(&bed_unsorted2bed_sorted_thread,
+                       NULL,
+                       c2b_write_in_bytes_to_in_process,
+                       &bed_unsorted2bed_sorted_stage);
+        pthread_create(&bed_sorted2stdout_thread,
+                       NULL,
+                       c2b_write_out_bytes_to_stdout,
+                       &bed_sorted2stdout_stage);
+    }
+    else if (c2b_globals.output_format_idx == STARCH_FORMAT) {
+        pthread_create(&bam2sam_thread,
+                       NULL,
+                       c2b_read_bytes_from_stdin,
+                       &bam2sam_stage);
+        pthread_create(&sam2bed_unsorted_thread,
+                       NULL,
+                       c2b_process_intermediate_bytes_by_lines,
+                       &sam2bed_unsorted_stage);
+        pthread_create(&bed_unsorted2bed_sorted_thread,
+                       NULL,
+                       c2b_write_in_bytes_to_in_process,
+                       &bed_unsorted2bed_sorted_stage);
+        pthread_create(&bed_sorted2starch_thread,
+                       NULL,
+                       c2b_write_out_bytes_to_in_process,
+                       &bed_sorted2starch_stage);
+        pthread_create(&starch2stdout_thread,
+                       NULL,
+                       c2b_write_out_bytes_to_stdout,
+                       &starch2stdout_stage);
+    }
+
+    if ((!c2b_globals.sort_flag) && (c2b_globals.output_format_idx == BED_FORMAT)) {
+        pthread_join(bam2sam_thread, (void **) NULL);
+        pthread_join(sam2bed_unsorted_thread, (void **) NULL);
+        pthread_join(bed_unsorted2stdout_thread, (void **) NULL);
+    }
+    else if (c2b_globals.output_format_idx == BED_FORMAT) {
+        pthread_join(bam2sam_thread, (void **) NULL);
+        pthread_join(sam2bed_unsorted_thread, (void **) NULL);
+        pthread_join(bed_unsorted2bed_sorted_thread, (void **) NULL);
+        pthread_join(bed_sorted2stdout_thread, (void **) NULL);
+    }
+    else if (c2b_globals.output_format_idx == STARCH_FORMAT) {
+        pthread_join(bam2sam_thread, (void **) NULL);
+        pthread_join(sam2bed_unsorted_thread, (void **) NULL);
+        pthread_join(bed_unsorted2bed_sorted_thread, (void **) NULL);
+        pthread_join(bed_sorted2starch_thread, (void **) NULL);
+        pthread_join(starch2stdout_thread, (void **) NULL);
+    }
+
+#ifdef DEBUG
+    fprintf(stderr, "--- c2b_init_bam_conversion() - exit  ---\n");
+#endif
+}
+
+static void
+c2b_init_gff_conversion(c2b_pipeset_t *p)
+{
+#ifdef DEBUG
+    fprintf(stderr, "--- c2b_init_gff_conversion() - enter ---\n");
+#endif
+
+    pthread_t cat2gff_thread; 
+    pthread_t gff2bed_unsorted_thread; 
+    pthread_t bed_unsorted2stdout_thread;
+    pthread_t bed_unsorted2bed_sorted_thread;
+    pthread_t bed_sorted2stdout_thread;
+    pthread_t bed_sorted2starch_thread;
+    pthread_t starch2stdout_thread;
+    pid_t cat2gff_proc;
+    pid_t bed_unsorted2bed_sorted_proc;
+    pid_t bed_sorted2starch_proc;
+    c2b_pipeline_stage_t cat2gff_stage;
+    c2b_pipeline_stage_t gff2bed_unsorted_stage;
+    c2b_pipeline_stage_t bed_unsorted2stdout_stage;
+    c2b_pipeline_stage_t bed_unsorted2bed_sorted_stage;
+    c2b_pipeline_stage_t bed_sorted2stdout_stage;
+    c2b_pipeline_stage_t bed_sorted2starch_stage;
+    c2b_pipeline_stage_t starch2stdout_stage;
+    char cat2gff_cmd[MAX_LINE_LENGTH_VALUE] = {0};
+    char bed_unsorted2bed_sorted_cmd[MAX_LINE_LENGTH_VALUE] = {0};
+    char bed_sorted2starch_cmd[MAX_LINE_LENGTH_VALUE] = {0};
+    void (*gff2bed_unsorted_line_functor)(char *, ssize_t *, char *, ssize_t) = NULL;
+
+    gff2bed_unsorted_line_functor = c2b_line_convert_gff_to_bed_unsorted;
+
+    if ((!c2b_globals.sort_flag) && (c2b_globals.output_format_idx == BED_FORMAT)) {
+        cat2gff_stage.pipeset = p;
+        cat2gff_stage.line_functor = NULL;
+        cat2gff_stage.src = -1; /* src is really stdin */
+        cat2gff_stage.dest = 0;
+        
+        gff2bed_unsorted_stage.pipeset = p;
+        gff2bed_unsorted_stage.line_functor = gff2bed_unsorted_line_functor;
+        gff2bed_unsorted_stage.src = 0;
+        gff2bed_unsorted_stage.dest = 1;
+
+        bed_unsorted2stdout_stage.pipeset = p;
+        bed_unsorted2stdout_stage.line_functor = NULL;
+        bed_unsorted2stdout_stage.src = 1;
+        bed_unsorted2stdout_stage.dest = -1; /* dest BED is stdout */
+    }
+    else if (c2b_globals.output_format_idx == BED_FORMAT) {
+        cat2gff_stage.pipeset = p;
+        cat2gff_stage.line_functor = NULL;
+        cat2gff_stage.src = -1; /* src is really stdin */
+        cat2gff_stage.dest = 0;
+        
+        gff2bed_unsorted_stage.pipeset = p;
+        gff2bed_unsorted_stage.line_functor = gff2bed_unsorted_line_functor;
+        gff2bed_unsorted_stage.src = 0;
+        gff2bed_unsorted_stage.dest = 1;
+        
+        bed_unsorted2bed_sorted_stage.pipeset = p;
+        bed_unsorted2bed_sorted_stage.line_functor = NULL;
+        bed_unsorted2bed_sorted_stage.src = 1;
+        bed_unsorted2bed_sorted_stage.dest = 2;
+
+        bed_sorted2stdout_stage.pipeset = p;
+        bed_sorted2stdout_stage.line_functor = NULL;
+        bed_sorted2stdout_stage.src = 2;
+        bed_sorted2stdout_stage.dest = -1; /* dest BED is stdout */
+    }
+    else if (c2b_globals.output_format_idx == STARCH_FORMAT) {
+        cat2gff_stage.pipeset = p;
+        cat2gff_stage.line_functor = NULL;
+        cat2gff_stage.src = -1; /* src is really stdin */
+        cat2gff_stage.dest = 0;
+        
+        gff2bed_unsorted_stage.pipeset = p;
+        gff2bed_unsorted_stage.line_functor = gff2bed_unsorted_line_functor;
+        gff2bed_unsorted_stage.src = 0;
+        gff2bed_unsorted_stage.dest = 1;
+
+        bed_unsorted2bed_sorted_stage.pipeset = p;
+        bed_unsorted2bed_sorted_stage.line_functor = NULL;
+        bed_unsorted2bed_sorted_stage.src = 1;
+        bed_unsorted2bed_sorted_stage.dest = 2;
+
+        bed_sorted2starch_stage.pipeset = p;
+        bed_sorted2starch_stage.line_functor = NULL;
+        bed_sorted2starch_stage.src = 2;
+        bed_sorted2starch_stage.dest = 3;
+
+        starch2stdout_stage.pipeset = p;
+        starch2stdout_stage.line_functor = NULL;
+        starch2stdout_stage.src = 3;
+        starch2stdout_stage.dest = -1; /* dest Starch is stdout */
+    }
+    else {
+        fprintf(stderr, "Error: Unknown GFF conversion parameter combination\n");
+        c2b_print_usage(stderr);
+        exit(EXIT_FAILURE);
+    }
+
+    /*
+       We open pid_t (process) instances to handle data in a specified order. 
+    */
+
+    c2b_cmd_cat_stdin(cat2gff_cmd);
+#ifdef DEBUG
+    fprintf(stderr, "Debug: c2b_cmd_cat_stdin: [%s]\n", cat2gff_cmd);
+#endif
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+
+    cat2gff_proc = c2b_popen4(cat2gff_cmd,
+			      p->in[0],
+			      p->out[0],
+			      p->err[0],
+			      POPEN4_FLAG_NONE);
+
+#pragma GCC diagnostic pop
+
+    if (c2b_globals.sort_flag) {
+        c2b_cmd_sort_bed(bed_unsorted2bed_sorted_cmd);
+#ifdef DEBUG
+        fprintf(stderr, "Debug: c2b_cmd_sort_bed: [%s]\n", bed_unsorted2bed_sorted_cmd);
+#endif
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+        bed_unsorted2bed_sorted_proc = c2b_popen4(bed_unsorted2bed_sorted_cmd,
+                                                  p->in[2],
+                                                  p->out[2],
+                                                  p->err[2],
+                                                  POPEN4_FLAG_NONE);
+#pragma GCC diagnostic pop
+    }
+
+    if (c2b_globals.output_format_idx == STARCH_FORMAT) {
+        c2b_cmd_starch_bed(bed_sorted2starch_cmd);
+#ifdef DEBUG
+        fprintf(stderr, "Debug: c2b_cmd_starch_bed: [%s]\n", bed_sorted2starch_cmd);
+#endif
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+        bed_sorted2starch_proc = c2b_popen4(bed_sorted2starch_cmd,
+                                            p->in[3],
+                                            p->out[3],
+                                            p->err[3],
+                                            POPEN4_FLAG_NONE);
+#pragma GCC diagnostic pop
+    }
+
+#ifdef DEBUG
+    c2b_debug_pipeset(p, MAX_PIPES);
+#endif
+
+    /*
+       Once we have the desired process instances, we create and join
+       threads for their ordered execution.
+    */
+
+    if ((!c2b_globals.sort_flag) && (c2b_globals.output_format_idx == BED_FORMAT)) {
+        pthread_create(&cat2gff_thread,
+                       NULL,
+                       c2b_read_bytes_from_stdin,
+                       &cat2gff_stage);
+        pthread_create(&gff2bed_unsorted_thread,
+                       NULL,
+                       c2b_process_intermediate_bytes_by_lines,
+                       &gff2bed_unsorted_stage);
+        pthread_create(&bed_unsorted2stdout_thread,
+                       NULL,
+                       c2b_write_in_bytes_to_stdout,
+                       &bed_unsorted2stdout_stage);
+    }
+    else if (c2b_globals.output_format_idx == BED_FORMAT) {
+        pthread_create(&cat2gff_thread,
+                       NULL,
+                       c2b_read_bytes_from_stdin,
+                       &cat2gff_stage);
+        pthread_create(&gff2bed_unsorted_thread,
+                       NULL,
+                       c2b_process_intermediate_bytes_by_lines,
+                       &gff2bed_unsorted_stage);
+        pthread_create(&bed_unsorted2bed_sorted_thread,
+                       NULL,
+                       c2b_write_in_bytes_to_in_process,
+                       &bed_unsorted2bed_sorted_stage);
+        pthread_create(&bed_sorted2stdout_thread,
+                       NULL,
+                       c2b_write_out_bytes_to_stdout,
+                       &bed_sorted2stdout_stage);
+    }
+    else if (c2b_globals.output_format_idx == STARCH_FORMAT) {
+        pthread_create(&cat2gff_thread,
+                       NULL,
+                       c2b_read_bytes_from_stdin,
+                       &cat2gff_stage);
+        pthread_create(&gff2bed_unsorted_thread,
+                       NULL,
+                       c2b_process_intermediate_bytes_by_lines,
+                       &gff2bed_unsorted_stage);
+        pthread_create(&bed_unsorted2bed_sorted_thread,
+                       NULL,
+                       c2b_write_in_bytes_to_in_process,
+                       &bed_unsorted2bed_sorted_stage);
+        pthread_create(&bed_sorted2starch_thread,
+                       NULL,
+                       c2b_write_out_bytes_to_in_process,
+                       &bed_sorted2starch_stage);
+        pthread_create(&starch2stdout_thread,
+                       NULL,
+                       c2b_write_out_bytes_to_stdout,
+                       &starch2stdout_stage);
+    }
+
+    if ((!c2b_globals.sort_flag) && (c2b_globals.output_format_idx == BED_FORMAT)) {
+        pthread_join(cat2gff_thread, (void **) NULL);
+        pthread_join(gff2bed_unsorted_thread, (void **) NULL);
+        pthread_join(bed_unsorted2stdout_thread, (void **) NULL);
+    }
+    else if (c2b_globals.output_format_idx == BED_FORMAT) {
+        pthread_join(cat2gff_thread, (void **) NULL);
+        pthread_join(gff2bed_unsorted_thread, (void **) NULL);
+        pthread_join(bed_unsorted2bed_sorted_thread, (void **) NULL);
+        pthread_join(bed_sorted2stdout_thread, (void **) NULL);
+    }
+    else if (c2b_globals.output_format_idx == STARCH_FORMAT) {
+        pthread_join(cat2gff_thread, (void **) NULL);
+        pthread_join(gff2bed_unsorted_thread, (void **) NULL);
+        pthread_join(bed_unsorted2bed_sorted_thread, (void **) NULL);
+        pthread_join(bed_sorted2starch_thread, (void **) NULL);
+        pthread_join(starch2stdout_thread, (void **) NULL);
+    }
+
+#ifdef DEBUG
+    fprintf(stderr, "--- c2b_init_gff_conversion() - exit  ---\n");
 #endif
 }
 
@@ -309,247 +793,6 @@ c2b_init_sam_conversion(c2b_pipeset_t *p)
 #endif
 }
 
-static void
-c2b_init_bam_conversion(c2b_pipeset_t *p)
-{
-#ifdef DEBUG
-    fprintf(stderr, "--- c2b_init_bam_conversion() - enter ---\n");
-#endif
-
-    pthread_t bam2sam_thread; 
-    pthread_t sam2bed_unsorted_thread; 
-    pthread_t bed_unsorted2stdout_thread;
-    pthread_t bed_unsorted2bed_sorted_thread;
-    pthread_t bed_sorted2stdout_thread;
-    pthread_t bed_sorted2starch_thread;
-    pthread_t starch2stdout_thread;
-    pid_t bam2sam_proc;
-    pid_t bed_unsorted2bed_sorted_proc;
-    pid_t bed_sorted2starch_proc;
-    c2b_pipeline_stage_t bam2sam_stage;
-    c2b_pipeline_stage_t sam2bed_unsorted_stage;
-    c2b_pipeline_stage_t bed_unsorted2stdout_stage;
-    c2b_pipeline_stage_t bed_unsorted2bed_sorted_stage;
-    c2b_pipeline_stage_t bed_sorted2stdout_stage;
-    c2b_pipeline_stage_t bed_sorted2starch_stage;
-    c2b_pipeline_stage_t starch2stdout_stage;
-    char bam2sam_cmd[MAX_LINE_LENGTH_VALUE] = {0};
-    char bed_unsorted2bed_sorted_cmd[MAX_LINE_LENGTH_VALUE] = {0};
-    char bed_sorted2starch_cmd[MAX_LINE_LENGTH_VALUE] = {0};
-    void (*sam2bed_unsorted_line_functor)(char *, ssize_t *, char *, ssize_t) = NULL;
-
-    sam2bed_unsorted_line_functor = (!c2b_globals.split_flag ?
-                                     c2b_line_convert_sam_to_bed_unsorted_without_split_operation :
-                                     c2b_line_convert_sam_to_bed_unsorted_with_split_operation);
-
-    if ((!c2b_globals.sort_flag) && (c2b_globals.output_format_idx == BED_FORMAT)) {
-        bam2sam_stage.pipeset = p;
-        bam2sam_stage.line_functor = NULL;
-        bam2sam_stage.src = -1; /* src is really stdin */
-        bam2sam_stage.dest = 0;
-        
-        sam2bed_unsorted_stage.pipeset = p;
-        sam2bed_unsorted_stage.line_functor = sam2bed_unsorted_line_functor;
-        sam2bed_unsorted_stage.src = 0;
-        sam2bed_unsorted_stage.dest = 1;
-
-        bed_unsorted2stdout_stage.pipeset = p;
-        bed_unsorted2stdout_stage.line_functor = NULL;
-        bed_unsorted2stdout_stage.src = 1;
-        bed_unsorted2stdout_stage.dest = -1; /* dest BED is stdout */
-    }
-    else if (c2b_globals.output_format_idx == BED_FORMAT) {
-        bam2sam_stage.pipeset = p;
-        bam2sam_stage.line_functor = NULL;
-        bam2sam_stage.src = -1; /* src is really stdin */
-        bam2sam_stage.dest = 0;
-        
-        sam2bed_unsorted_stage.pipeset = p;
-        sam2bed_unsorted_stage.line_functor = sam2bed_unsorted_line_functor;
-        sam2bed_unsorted_stage.src = 0;
-        sam2bed_unsorted_stage.dest = 1;
-        
-        bed_unsorted2bed_sorted_stage.pipeset = p;
-        bed_unsorted2bed_sorted_stage.line_functor = NULL;
-        bed_unsorted2bed_sorted_stage.src = 1;
-        bed_unsorted2bed_sorted_stage.dest = 2;
-
-        bed_sorted2stdout_stage.pipeset = p;
-        bed_sorted2stdout_stage.line_functor = NULL;
-        bed_sorted2stdout_stage.src = 2;
-        bed_sorted2stdout_stage.dest = -1; /* dest BED is stdout */
-    }
-    else if (c2b_globals.output_format_idx == STARCH_FORMAT) {
-        bam2sam_stage.pipeset = p;
-        bam2sam_stage.line_functor = NULL;
-        bam2sam_stage.src = -1; /* src is really stdin */
-        bam2sam_stage.dest = 0;
-        
-        sam2bed_unsorted_stage.pipeset = p;
-        sam2bed_unsorted_stage.line_functor = sam2bed_unsorted_line_functor;
-        sam2bed_unsorted_stage.src = 0;
-        sam2bed_unsorted_stage.dest = 1;
-
-        bed_unsorted2bed_sorted_stage.pipeset = p;
-        bed_unsorted2bed_sorted_stage.line_functor = NULL;
-        bed_unsorted2bed_sorted_stage.src = 1;
-        bed_unsorted2bed_sorted_stage.dest = 2;
-
-        bed_sorted2starch_stage.pipeset = p;
-        bed_sorted2starch_stage.line_functor = NULL;
-        bed_sorted2starch_stage.src = 2;
-        bed_sorted2starch_stage.dest = 3;
-
-        starch2stdout_stage.pipeset = p;
-        starch2stdout_stage.line_functor = NULL;
-        starch2stdout_stage.src = 3;
-        starch2stdout_stage.dest = -1; /* dest Starch is stdout */
-    }
-    else {
-        fprintf(stderr, "Error: Unknown BAM conversion parameter combination\n");
-        c2b_print_usage(stderr);
-        exit(EXIT_FAILURE);
-    }
-
-    /*
-       We open pid_t (process) instances to handle data in a specified order. 
-    */
-
-    c2b_cmd_bam_to_sam(bam2sam_cmd);
-#ifdef DEBUG
-    fprintf(stderr, "Debug: c2b_cmd_bam_to_sam: [%s]\n", bam2sam_cmd);
-#endif
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunknown-pragmas"
-#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
-    bam2sam_proc = c2b_popen4(bam2sam_cmd,
-			      p->in[0],
-			      p->out[0],
-			      p->err[0],
-			      POPEN4_FLAG_NONE);
-
-#pragma GCC diagnostic pop
-
-    if (c2b_globals.sort_flag) {
-        c2b_cmd_sort_bed(bed_unsorted2bed_sorted_cmd);
-#ifdef DEBUG
-        fprintf(stderr, "Debug: c2b_cmd_sort_bed: [%s]\n", bed_unsorted2bed_sorted_cmd);
-#endif
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunknown-pragmas"
-#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
-        bed_unsorted2bed_sorted_proc = c2b_popen4(bed_unsorted2bed_sorted_cmd,
-                                                  p->in[2],
-                                                  p->out[2],
-                                                  p->err[2],
-                                                  POPEN4_FLAG_NONE);
-#pragma GCC diagnostic pop
-    }
-
-    if (c2b_globals.output_format_idx == STARCH_FORMAT) {
-        c2b_cmd_starch_bed(bed_sorted2starch_cmd);
-#ifdef DEBUG
-        fprintf(stderr, "Debug: c2b_cmd_starch_bed: [%s]\n", bed_sorted2starch_cmd);
-#endif
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunknown-pragmas"
-#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
-        bed_sorted2starch_proc = c2b_popen4(bed_sorted2starch_cmd,
-                                            p->in[3],
-                                            p->out[3],
-                                            p->err[3],
-                                            POPEN4_FLAG_NONE);
-#pragma GCC diagnostic pop
-    }
-
-#ifdef DEBUG
-    c2b_debug_pipeset(p, MAX_PIPES);
-#endif
-
-    /*
-       Once we have the desired process instances, we create and join
-       threads for their ordered execution.
-    */
-
-    if ((!c2b_globals.sort_flag) && (c2b_globals.output_format_idx == BED_FORMAT)) {
-        pthread_create(&bam2sam_thread,
-                       NULL,
-                       c2b_read_bytes_from_stdin,
-                       &bam2sam_stage);
-        pthread_create(&sam2bed_unsorted_thread,
-                       NULL,
-                       c2b_process_intermediate_bytes_by_lines,
-                       &sam2bed_unsorted_stage);
-        pthread_create(&bed_unsorted2stdout_thread,
-                       NULL,
-                       c2b_write_in_bytes_to_stdout,
-                       &bed_unsorted2stdout_stage);
-    }
-    else if (c2b_globals.output_format_idx == BED_FORMAT) {
-        pthread_create(&bam2sam_thread,
-                       NULL,
-                       c2b_read_bytes_from_stdin,
-                       &bam2sam_stage);
-        pthread_create(&sam2bed_unsorted_thread,
-                       NULL,
-                       c2b_process_intermediate_bytes_by_lines,
-                       &sam2bed_unsorted_stage);
-        pthread_create(&bed_unsorted2bed_sorted_thread,
-                       NULL,
-                       c2b_write_in_bytes_to_in_process,
-                       &bed_unsorted2bed_sorted_stage);
-        pthread_create(&bed_sorted2stdout_thread,
-                       NULL,
-                       c2b_write_out_bytes_to_stdout,
-                       &bed_sorted2stdout_stage);
-    }
-    else if (c2b_globals.output_format_idx == STARCH_FORMAT) {
-        pthread_create(&bam2sam_thread,
-                       NULL,
-                       c2b_read_bytes_from_stdin,
-                       &bam2sam_stage);
-        pthread_create(&sam2bed_unsorted_thread,
-                       NULL,
-                       c2b_process_intermediate_bytes_by_lines,
-                       &sam2bed_unsorted_stage);
-        pthread_create(&bed_unsorted2bed_sorted_thread,
-                       NULL,
-                       c2b_write_in_bytes_to_in_process,
-                       &bed_unsorted2bed_sorted_stage);
-        pthread_create(&bed_sorted2starch_thread,
-                       NULL,
-                       c2b_write_out_bytes_to_in_process,
-                       &bed_sorted2starch_stage);
-        pthread_create(&starch2stdout_thread,
-                       NULL,
-                       c2b_write_out_bytes_to_stdout,
-                       &starch2stdout_stage);
-    }
-
-    if ((!c2b_globals.sort_flag) && (c2b_globals.output_format_idx == BED_FORMAT)) {
-        pthread_join(bam2sam_thread, (void **) NULL);
-        pthread_join(sam2bed_unsorted_thread, (void **) NULL);
-        pthread_join(bed_unsorted2stdout_thread, (void **) NULL);
-    }
-    else if (c2b_globals.output_format_idx == BED_FORMAT) {
-        pthread_join(bam2sam_thread, (void **) NULL);
-        pthread_join(sam2bed_unsorted_thread, (void **) NULL);
-        pthread_join(bed_unsorted2bed_sorted_thread, (void **) NULL);
-        pthread_join(bed_sorted2stdout_thread, (void **) NULL);
-    }
-    else if (c2b_globals.output_format_idx == STARCH_FORMAT) {
-        pthread_join(bam2sam_thread, (void **) NULL);
-        pthread_join(sam2bed_unsorted_thread, (void **) NULL);
-        pthread_join(bed_unsorted2bed_sorted_thread, (void **) NULL);
-        pthread_join(bed_sorted2starch_thread, (void **) NULL);
-        pthread_join(starch2stdout_thread, (void **) NULL);
-    }
-
-#ifdef DEBUG
-    fprintf(stderr, "--- c2b_init_bam_conversion() - exit  ---\n");
-#endif
-}
-
 static inline void
 c2b_cmd_cat_stdin(char *cmd)
 {
@@ -670,6 +913,185 @@ c2b_cmd_starch_bed(char *cmd)
 }
 
 static void
+c2b_line_convert_gff_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size)
+{
+    ssize_t gff_field_offsets[MAX_FIELD_LENGTH_VALUE] = {-1};
+    int gff_field_idx = 0;
+    ssize_t current_src_posn = -1;
+
+    while (++current_src_posn < src_size) {
+        if ((src[current_src_posn] == c2b_tab_delim) || (src[current_src_posn] == c2b_line_delim)) {
+            gff_field_offsets[gff_field_idx++] = current_src_posn;
+        }
+    }
+    gff_field_offsets[gff_field_idx] = src_size;
+
+    /* 
+       If number of fields is not in bounds, we may need to exit early
+    */
+
+    if (((gff_field_idx + 1) < c2b_gff_field_min) || ((gff_field_idx + 1) > c2b_gff_field_max)) {
+        if (gff_field_idx == 0) {
+            char non_interval_str[MAX_FIELD_LENGTH_VALUE] = {0};
+            memcpy(non_interval_str, src, current_src_posn);
+            if (strcmp(non_interval_str, c2b_gff_header) == 0) {
+                if (!c2b_globals.keep_header_flag) {
+                    return;
+                }
+                else {
+                    /* copy header line to destination stream buffer */
+                    char src_header_line_str[MAX_LINE_LENGTH_VALUE] = {0};
+                    char dest_header_line_str[MAX_LINE_LENGTH_VALUE] = {0};
+                    memcpy(src_header_line_str, src, src_size);
+                    sprintf(dest_header_line_str, "%s\t%u\t%u\t%s\n", c2b_header_chr_name, c2b_globals.header_line_idx, (c2b_globals.header_line_idx + 1), src_header_line_str);
+                    memcpy(dest + *dest_size, dest_header_line_str, strlen(dest_header_line_str));
+                    *dest_size += strlen(dest_header_line_str);
+                    c2b_globals.header_line_idx++;
+                    return;                    
+                }
+            }
+            else if (strcmp(non_interval_str, c2b_gff_fasta) == 0) {
+                return;
+            }
+            else {
+                return;
+            }
+        }
+        else {
+            fprintf(stderr, "Error: Invalid field count (%d) -- input file may not match input format\n", gff_field_idx);
+            c2b_print_usage(stderr);
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    /* 0 - seqid */
+    char seqid_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t seqid_size = gff_field_offsets[0] - 1;
+    memcpy(seqid_str, src, seqid_size);
+
+    /* 1 - source */
+    char source_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t source_size = gff_field_offsets[1] - gff_field_offsets[0] - 1;
+    memcpy(source_str, src + gff_field_offsets[0] + 1, source_size);
+
+    /* 2 - type */
+    char type_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t type_size = gff_field_offsets[2] - gff_field_offsets[1] - 1;
+    memcpy(type_str, src + gff_field_offsets[1] + 1, type_size);
+
+    /* 3 - start */
+    char start_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t start_size = gff_field_offsets[3] - gff_field_offsets[2] - 1;
+    memcpy(start_str, src + gff_field_offsets[2] + 1, start_size);
+    unsigned long long int start_val = strtoull(start_str, NULL, 10);
+
+    /* 4 - end */
+    char end_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t end_size = gff_field_offsets[4] - gff_field_offsets[3] - 1;
+    memcpy(end_str, src + gff_field_offsets[3] + 1, end_size);
+    unsigned long long int end_val = strtoull(end_str, NULL, 10);
+
+    /* 5 - score */
+    char score_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t score_size = gff_field_offsets[5] - gff_field_offsets[4] - 1;
+    memcpy(score_str, src + gff_field_offsets[4] + 1, score_size);
+
+    /* 6 - strand */
+    char strand_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t strand_size = gff_field_offsets[6] - gff_field_offsets[5] - 1;
+    memcpy(strand_str, src + gff_field_offsets[5] + 1, strand_size);
+
+    /* 7 - phase */
+    char phase_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t phase_size = gff_field_offsets[7] - gff_field_offsets[6] - 1;
+    memcpy(phase_str, src + gff_field_offsets[6] + 1, phase_size);
+
+    /* 8 - attributes */
+    char attributes_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t attributes_size = gff_field_offsets[8] - gff_field_offsets[7] - 1;
+    memcpy(attributes_str, src + gff_field_offsets[7] + 1, attributes_size);
+
+    c2b_gff_t gff;
+    gff.seqid = seqid_str;
+    gff.source = source_str;
+    gff.type = type_str;
+    gff.start = start_val;
+    gff.end = end_val;
+    gff.score = score_str;
+    gff.strand = strand_str;
+    gff.phase = phase_str;
+    gff.attributes = attributes_str;
+
+    /* Fix coordinates, if necessary */
+
+    if (gff.start == gff.end) {
+        gff.start -= 1;
+        memcpy(attributes_str + strlen(attributes_str), c2b_gff_zero_length_insertion_attribute, strlen(c2b_gff_zero_length_insertion_attribute));
+    }
+
+    /* Parse ID value from attributes */
+
+    gff.id = NULL;
+
+    /* Convert GFF struct to BED string */
+
+    char dest_line_str[MAX_LINE_LENGTH_VALUE] = {0};
+    c2b_line_convert_gff_to_bed(gff, dest_line_str);
+    memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
+    *dest_size += strlen(dest_line_str);
+}
+
+static inline void
+c2b_line_convert_gff_to_bed(c2b_gff_t g, char *dest_line)
+{
+    /* 
+       For GFF-formatted data, we use the mapping provided by BEDOPS convention described at:
+
+       http://bedops.readthedocs.org/en/latest/content/reference/file-management/conversion/gff2bed.html
+
+       GFF field                 BED column index       BED field
+       -------------------------------------------------------------------------
+       seqid                     1                      chromosome
+       start                     2                      start
+       end                       3                      stop
+       ID (via attributes)       4                      id
+       score                     5                      score
+       strand                    6                      strand
+
+       The remaining GFF columns are mapped as-is, in same order, to adjacent BED columns:
+
+       GFF field                 BED column index       BED field
+       -------------------------------------------------------------------------
+       source                    7                      -
+       type                      8                      -
+       phase                     9                      -
+       attributes                10                     -
+    */
+
+    sprintf(dest_line,
+            "%s\t"                              \
+            "%" PRIu64 "\t"                     \
+            "%" PRIu64 "\t"                     \
+            "%s\t"                              \
+            "%s\t"                              \
+            "%s\t"                              \
+            "%s\t"                              \
+            "%s\t"                              \
+            "%s\t"                              \
+            "%s\n",
+            g.seqid,
+            g.start,
+            g.end,
+            g.id,
+            g.score,
+            g.strand,
+            g.source,
+            g.type,
+            g.phase,
+            g.attributes);
+}
+
+static void
 c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t *dest_size, char *src, ssize_t src_size)
 {
     /* 
@@ -680,16 +1102,13 @@ c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t
 
     ssize_t sam_field_offsets[MAX_FIELD_LENGTH_VALUE] = {-1};
     int sam_field_idx = 0;
-    const char tab_delim = '\t';
-    const char line_delim = '\n';
-    const char sam_header_prefix = '@';
     ssize_t current_src_posn = -1;
     
     /* 
        Find offsets or process header line 
     */
 
-    if (src[0] == sam_header_prefix) {
+    if (src[0] == c2b_sam_header_prefix) {
         if (!c2b_globals.keep_header_flag) {
             /* skip header line */
             return;
@@ -708,7 +1127,7 @@ c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t
     }
 
     while (++current_src_posn < src_size) {
-        if ((src[current_src_posn] == tab_delim) || (src[current_src_posn] == line_delim)) {
+        if ((src[current_src_posn] == c2b_tab_delim) || (src[current_src_posn] == c2b_line_delim)) {
             sam_field_offsets[sam_field_idx++] = current_src_posn;
         }
     }
@@ -848,16 +1267,13 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
 
     ssize_t sam_field_offsets[MAX_FIELD_LENGTH_VALUE] = {-1};
     int sam_field_idx = 0;
-    const char tab_delim = '\t';
-    const char line_delim = '\n';
-    const char sam_header_prefix = '@';
     ssize_t current_src_posn = -1;
 
     /* 
        Find offsets or process header line 
     */
 
-    if (src[0] == sam_header_prefix) {
+    if (src[0] == c2b_sam_header_prefix) {
         if (!c2b_globals.keep_header_flag) {
             /* skip header line */
             return;
@@ -876,7 +1292,7 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
     }
 
     while (++current_src_posn < src_size) {
-        if ((src[current_src_posn] == tab_delim) || (src[current_src_posn] == line_delim)) {
+        if ((src[current_src_posn] == c2b_tab_delim) || (src[current_src_posn] == c2b_line_delim)) {
             sam_field_offsets[sam_field_idx++] = current_src_posn;
         }
     }
@@ -908,6 +1324,7 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
     for (op_idx = 0; op_idx < c2b_globals.cigar->length; ++op_idx) {
         cigar_length += c2b_globals.cigar->ops[op_idx].bases;
     }
+
     /* 
        Firstly, is the read mapped? If not, and c2b_globals.all_reads_flag is kFalse, we skip over this line
     */
@@ -1808,7 +2225,7 @@ c2b_test_dependencies()
         memcpy(path_sort_bed, path, strlen(path) + 1);
 
 #ifdef DEBUG
-        fprintf(stderr, "Debug: Searching [%s] for samtools\n", path_sort_bed);
+        fprintf(stderr, "Debug: Searching [%s] for sort-bed\n", path_sort_bed);
 #endif
 
         if (c2b_print_matches(path_sort_bed, sort_bed) != kTrue) {
@@ -1869,6 +2286,10 @@ c2b_test_dependencies()
         exit(EXIT_FAILURE);
     }
     memcpy(path_cat, path, strlen(path) + 1);
+
+#ifdef DEBUG
+        fprintf(stderr, "Debug: Searching [%s] for cat\n", path_cat);
+#endif
     
     if (c2b_print_matches(path_cat, cat) != kTrue) {
         fprintf(stderr, "Error: Cannot find cat binary required for piping IO\n");

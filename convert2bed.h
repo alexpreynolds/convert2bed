@@ -41,42 +41,46 @@ extern const char *c2b_starch;
 const char *c2b_starch = "starch";
 extern const char *c2b_cat;
 const char *c2b_cat = "cat";
-
 extern const char *c2b_default_output_format;
 const char *c2b_default_output_format = "bed";
-
 extern const char *c2b_unmapped_read_chr_name;
 const char *c2b_unmapped_read_chr_name = "_unmapped";
-
 extern const char *c2b_header_chr_name;
 const char *c2b_header_chr_name = "_header";
-
 extern const char *sort_bed_max_mem_arg;
 const char *sort_bed_max_mem_arg = " --max-mem ";
-
 extern const char *sort_bed_max_mem_default_arg;
 const char *sort_bed_max_mem_default_arg = " --max-mem 2G ";
-
 extern const char *sort_bed_tmpdir_arg;
 const char *sort_bed_tmpdir_arg = " --tmpdir ";
-
 extern const char *sort_bed_stdin;
 const char *sort_bed_stdin = " - ";
-
 extern const char *starch_bzip2_arg;
 const char *starch_bzip2_arg = " --bzip2 ";
-
 extern const char *starch_gzip_arg;
 const char *starch_gzip_arg = " --gzip ";
-
 extern const char *starch_note_prefix_arg;
 const char *starch_note_prefix_arg = " --note=\"";
-
 extern const char *starch_note_suffix_arg;
 const char *starch_note_suffix_arg = "\" ";
-
 extern const char *starch_stdin_arg;
 const char *starch_stdin_arg = " - ";
+extern const char c2b_tab_delim;
+const char c2b_tab_delim = '\t';
+extern const char c2b_line_delim;
+const char c2b_line_delim = '\t';
+extern const char c2b_sam_header_prefix;
+const char c2b_sam_header_prefix = '@';
+extern const char *c2b_gff_header;
+const char *c2b_gff_header = "##gff-version 3";
+extern const char *c2b_gff_fasta;
+const char *c2b_gff_fasta = "##FASTA";
+extern const int c2b_gff_field_min;
+const int c2b_gff_field_min = 9;
+extern const int c2b_gff_field_max;
+const int c2b_gff_field_max = 9;
+extern const char *c2b_gff_zero_length_insertion_attribute;
+const char *c2b_gff_zero_length_insertion_attribute = ";zero_length_insertion=True";
 
 typedef int boolean;
 extern const boolean kTrue;
@@ -132,7 +136,7 @@ const char default_cigar_op_operation = '-';
    SAM fields are in the following ordering:
    
    Index   SAM field
-   -------------------------------------------------------------------------
+   ---------------------------------------------------------
    0       QNAME
    1       FLAG
    2       RNAME
@@ -148,12 +152,12 @@ const char default_cigar_op_operation = '-';
 */
 
 typedef struct sam {
-    char *rname;
-    unsigned long long int start;
-    unsigned long long int stop;
     char *qname;
     int flag;
     char *strand;
+    char *rname;
+    unsigned long long int start;
+    unsigned long long int stop;
     char *mapq;
     char *cigar;
     char *rnext;
@@ -163,6 +167,39 @@ typedef struct sam {
     char *qual;
     char *opt;
 } c2b_sam_t;
+
+/* 
+   The GFF format is described at:
+
+   http://www.sequenceontology.org/gff3.shtml
+
+   GFF fields are in the following ordering:
+
+   Index   GFF field
+   ---------------------------------------------------------
+   0       seqid
+   1       source
+   2       type
+   3       start
+   4       end
+   5       score
+   6       strand
+   7       phase
+   8       attributes
+*/
+
+typedef struct gff {
+    char *seqid;
+    char *source;
+    char *type;
+    unsigned long long int start;
+    unsigned long long int end;
+    char *score;
+    char *strand;
+    char *phase;
+    char *attributes;
+    char *id;
+} c2b_gff_t;
 
 /* 
    At most, we need 4 pipes to handle the most complex conversion
@@ -361,12 +398,15 @@ extern "C" {
 #endif
 
     static void              c2b_init_conversion(c2b_pipeset_t *p);
-    static void              c2b_init_sam_conversion(c2b_pipeset_t *p);
     static void              c2b_init_bam_conversion(c2b_pipeset_t *p);
+    static void              c2b_init_gff_conversion(c2b_pipeset_t *p);
+    static void              c2b_init_sam_conversion(c2b_pipeset_t *p);
     static inline void       c2b_cmd_cat_stdin(char *cmd);
     static inline void       c2b_cmd_bam_to_sam(char *cmd);
     static inline void       c2b_cmd_sort_bed(char *cmd);
     static inline void       c2b_cmd_starch_bed(char *cmd);
+    static void              c2b_line_convert_gff_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
+    static inline void       c2b_line_convert_gff_to_bed(c2b_gff_t g, char *dest_line);
     static void              c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
     static void              c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *dest_size, char *src, ssize_t src_size); 
     static inline void       c2b_line_convert_sam_to_bed(c2b_sam_t s, char *dest_line);
