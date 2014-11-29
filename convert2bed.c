@@ -1022,18 +1022,29 @@ c2b_line_convert_gff_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
     gff.phase = phase_str;
     gff.attributes = attributes_str;
 
-    /* Fix coordinates, if necessary */
+    /* 
+       Fix coordinate indexing, and (if needed) add attribute for zero-length record
+    */
 
     if (gff.start == gff.end) {
         gff.start -= 1;
-        memcpy(attributes_str + strlen(attributes_str), c2b_gff_zero_length_insertion_attribute, strlen(c2b_gff_zero_length_insertion_attribute));
+        memcpy(attributes_str + strlen(attributes_str), 
+               c2b_gff_zero_length_insertion_attribute, 
+               strlen(c2b_gff_zero_length_insertion_attribute));
+    }
+    else {
+        gff.start -= 1;
     }
 
-    /* Parse ID value from attributes */
+    /* 
+       Parse ID value from attributes 
+    */
 
     gff.id = NULL;
 
-    /* Convert GFF struct to BED string */
+    /* 
+       Convert GFF struct to BED string 
+    */
 
     char dest_line_str[MAX_LINE_LENGTH_VALUE] = {0};
     c2b_line_convert_gff_to_bed(gff, dest_line_str);
