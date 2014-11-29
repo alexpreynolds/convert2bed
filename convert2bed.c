@@ -17,6 +17,7 @@ main(int argc, char **argv)
     /* check that stdin is available */
     if ((stats_res = fstat(fileno(stdin), &stats)) < 0) {
         fprintf(stderr, "Error: fstat() call failed");
+        c2b_print_usage(stderr);
         return EXIT_FAILURE;
     }
     if ((S_ISCHR(stats.st_mode) == kTrue) && (S_ISREG(stats.st_mode) == kFalse)) {
@@ -57,6 +58,7 @@ c2b_init_conversion(c2b_pipeset_t *p)
             break;
         default:
             fprintf(stderr, "Error: Currently unsupported format\n");
+            c2b_print_usage(stderr);
             exit(EXIT_FAILURE);
         }
 
@@ -162,7 +164,8 @@ c2b_init_sam_conversion(c2b_pipeset_t *p)
         starch2stdout_stage.dest = -1; /* dest Starch is stdout */
     }
     else {
-        fprintf(stderr, "Error: Unknown BAM conversion parameter combination\n");
+        fprintf(stderr, "Error: Unknown SAM conversion parameter combination\n");
+        c2b_print_usage(stderr);
         exit(EXIT_FAILURE);
     }
 
@@ -177,6 +180,7 @@ c2b_init_sam_conversion(c2b_pipeset_t *p)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+
     cat2sam_proc = c2b_popen4(cat2sam_cmd,
 			      p->in[0],
 			      p->out[0],
@@ -403,6 +407,7 @@ c2b_init_bam_conversion(c2b_pipeset_t *p)
     }
     else {
         fprintf(stderr, "Error: Unknown BAM conversion parameter combination\n");
+        c2b_print_usage(stderr);
         exit(EXIT_FAILURE);
     }
 
@@ -679,33 +684,45 @@ c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t
     const char line_delim = '\n';
     const char sam_header_prefix = '@';
     ssize_t current_src_posn = -1;
-
+    
     /* 
        Find offsets or process header line 
     */
-    while (++current_src_posn < src_size) {
-        if (src[current_src_posn] == sam_header_prefix) {
-            if (!c2b_globals.keep_header_flag) {
-                /* skip header line */
-                return;
-            }
-            else {
-                /* copy header line to destination stream buffer */
-                char src_header_line_str[MAX_LINE_LENGTH_VALUE] = {0};
-                char dest_header_line_str[MAX_LINE_LENGTH_VALUE] = {0};
-                memcpy(src_header_line_str, src, src_size);
-                sprintf(dest_header_line_str, "%s\t%u\t%u\t%s\n", c2b_header_chr_name, c2b_globals.header_line_idx, (c2b_globals.header_line_idx + 1), src_header_line_str);
-                memcpy(dest + *dest_size, dest_header_line_str, strlen(dest_header_line_str));
-                *dest_size += strlen(dest_header_line_str);
-                c2b_globals.header_line_idx++;
-                return;
-            }
+
+    if (src[0] == sam_header_prefix) {
+        if (!c2b_globals.keep_header_flag) {
+            /* skip header line */
+            return;
         }
+        else {
+            /* copy header line to destination stream buffer */
+            char src_header_line_str[MAX_LINE_LENGTH_VALUE] = {0};
+            char dest_header_line_str[MAX_LINE_LENGTH_VALUE] = {0};
+            memcpy(src_header_line_str, src, src_size);
+            sprintf(dest_header_line_str, "%s\t%u\t%u\t%s\n", c2b_header_chr_name, c2b_globals.header_line_idx, (c2b_globals.header_line_idx + 1), src_header_line_str);
+            memcpy(dest + *dest_size, dest_header_line_str, strlen(dest_header_line_str));
+            *dest_size += strlen(dest_header_line_str);
+            c2b_globals.header_line_idx++;
+            return;
+        }
+    }
+
+    while (++current_src_posn < src_size) {
         if ((src[current_src_posn] == tab_delim) || (src[current_src_posn] == line_delim)) {
             sam_field_offsets[sam_field_idx++] = current_src_posn;
         }
     }
     sam_field_offsets[sam_field_idx] = src_size;
+
+    /* 
+       If no more than one field is read in, then something went wrong
+    */
+
+    if (sam_field_idx == 0) {
+        fprintf(stderr, "Error: Invalid field count (%d) -- input file may not match input format\n", sam_field_idx);
+        c2b_print_usage(stderr);
+        exit(EXIT_FAILURE);
+    }
 
     /* 
        Firstly, is read mapped? If not, and c2b_globals.all_reads_flag is kFalse, we skip over this line
@@ -840,29 +857,40 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
        Find offsets or process header line 
     */
 
-    while (++current_src_posn < src_size) {
-        if (src[current_src_posn] == sam_header_prefix) {
-            if (!c2b_globals.keep_header_flag) {
-                /* skip header line */
-                return;
-            }
-            else {
-                /* copy header line to destination stream buffer */
-                char src_header_line_str[MAX_LINE_LENGTH_VALUE] = {0};
-                char dest_header_line_str[MAX_LINE_LENGTH_VALUE] = {0};
-                memcpy(src_header_line_str, src, src_size);
-                sprintf(dest_header_line_str, "%s\t%u\t%u\t%s\n", c2b_header_chr_name, c2b_globals.header_line_idx, (c2b_globals.header_line_idx + 1), src_header_line_str);
-                memcpy(dest + *dest_size, dest_header_line_str, strlen(dest_header_line_str));
-                *dest_size += strlen(dest_header_line_str);
-                c2b_globals.header_line_idx++;
-                return;
-            }
+    if (src[0] == sam_header_prefix) {
+        if (!c2b_globals.keep_header_flag) {
+            /* skip header line */
+            return;
         }
+        else {
+            /* copy header line to destination stream buffer */
+            char src_header_line_str[MAX_LINE_LENGTH_VALUE] = {0};
+            char dest_header_line_str[MAX_LINE_LENGTH_VALUE] = {0};
+            memcpy(src_header_line_str, src, src_size);
+            sprintf(dest_header_line_str, "%s\t%u\t%u\t%s\n", c2b_header_chr_name, c2b_globals.header_line_idx, (c2b_globals.header_line_idx + 1), src_header_line_str);
+            memcpy(dest + *dest_size, dest_header_line_str, strlen(dest_header_line_str));
+            *dest_size += strlen(dest_header_line_str);
+            c2b_globals.header_line_idx++;
+            return;
+        }
+    }
+
+    while (++current_src_posn < src_size) {
         if ((src[current_src_posn] == tab_delim) || (src[current_src_posn] == line_delim)) {
             sam_field_offsets[sam_field_idx++] = current_src_posn;
         }
     }
     sam_field_offsets[sam_field_idx] = src_size;
+
+    /* 
+       If no more than one field is read in, then something went wrong
+    */
+
+    if (sam_field_idx == 0) {
+        fprintf(stderr, "Error: Invalid field count (%d) -- input file may not match input format\n", sam_field_idx);
+        c2b_print_usage(stderr);
+        exit(EXIT_FAILURE);
+    }
 
     /* 
        Translate CIGAR string to operations
@@ -1191,11 +1219,13 @@ c2b_sam_init_cigar_ops(c2b_cigar_t **c, const ssize_t size)
     *c = malloc(sizeof(c2b_cigar_t));
     if (!*c) {
         fprintf(stderr, "Error: Could not allocate space for CIGAR struct pointer\n");
+        c2b_print_usage(stderr);
         exit(EXIT_FAILURE);
     }
     (*c)->ops = malloc(size * sizeof(c2b_cigar_op_t));
     if (!(*c)->ops) {
         fprintf(stderr, "Error: Could not allocate space for CIGAR struct operation pointer\n");
+        c2b_print_usage(stderr);
         exit(EXIT_FAILURE);
     }
     (*c)->size = size;
@@ -1288,19 +1318,21 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
     src_buffer = malloc(src_buffer_size);
     if (!src_buffer) {
         fprintf(stderr, "Error: Could not allocate space for intermediate source buffer.\n");
+        c2b_print_usage(stderr);
         exit(EXIT_FAILURE);
     }
 
     dest_buffer = malloc(dest_buffer_size);
     if (!dest_buffer) {
         fprintf(stderr, "Error: Could not allocate space for intermediate destination buffer.\n");
+        c2b_print_usage(stderr);
         exit(EXIT_FAILURE);
     }
 
     while ((src_bytes_read = read(pipes->out[stage->src][PIPE_READ],
                                   src_buffer + remainder_length,
                                   src_buffer_size - remainder_length)) > 0) {
-        
+
         /* 
            So here's what src_buffer looks like initially; basically, some stuff separated by
            newlines. The src_buffer will probably not terminate with a newline. So we first use 
@@ -1358,6 +1390,7 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
         if (remainder_offset == -1) {
             if (src_bytes_read + remainder_length == src_buffer_size) {
                 fprintf(stderr, "Error: Could not find newline in intermediate buffer; check input\n");
+                c2b_print_usage(stderr);
                 exit(EXIT_FAILURE);
             }
             remainder_offset = 0;
@@ -1524,6 +1557,7 @@ c2b_init_pipeset(c2b_pipeset_t *p, const size_t num)
     errs = malloc(num * sizeof(int *));
     if ((!ins) || (!outs) || (!errs)) {
         fprintf(stderr, "Error: Could not allocate space to temporary pipe arrays\n");
+        c2b_print_usage(stderr);
         exit(EXIT_FAILURE);
     }
 
@@ -1536,18 +1570,21 @@ c2b_init_pipeset(c2b_pipeset_t *p, const size_t num)
 	p->in[n] = malloc(PIPE_STREAMS * sizeof(int));
 	if (!p->in[n]) {
 	    fprintf(stderr, "Error: Could not allocate space to temporary internal pipe array\n");
+            c2b_print_usage(stderr);
 	    exit(EXIT_FAILURE);
 	}
 	p->out[n] = NULL;
 	p->out[n] = malloc(PIPE_STREAMS * sizeof(int));
 	if (!p->out[n]) {
 	    fprintf(stderr, "Error: Could not allocate space to temporary internal pipe array\n");
+            c2b_print_usage(stderr);
 	    exit(EXIT_FAILURE);
 	}
 	p->err[n] = NULL;
 	p->err[n] = malloc(PIPE_STREAMS * sizeof(int));
 	if (!p->err[n]) {
 	    fprintf(stderr, "Error: Could not allocate space to temporary internal pipe array\n");
+            c2b_print_usage(stderr);
 	    exit(EXIT_FAILURE);
 	}
 
@@ -1687,7 +1724,7 @@ c2b_popen4(const char* cmd, int pin[2], int pout[2], int perr[2], int flags)
             close(pout[PIPE_WRITE]);
         }
         if (~flags & POPEN4_FLAG_NOCLOSE_PARENT_STDERR && ~flags & POPEN4_FLAG_CLOSE_CHILD_STDERR) {
-            close(perr[PIPE_WRITE]);
+            //close(perr[PIPE_WRITE]);
         }
         return ret;
     }
@@ -1708,11 +1745,13 @@ c2b_test_dependencies()
 
     if ((p = getenv("PATH")) == NULL) {
         fprintf(stderr, "Error: Cannot retrieve environment PATH variable\n");
+        c2b_print_usage(stderr);
         exit(EXIT_FAILURE);
     }
     path = malloc(strlen(p) + 1);
     if (!path) {
         fprintf(stderr, "Error: Cannot allocate space for path variable copy\n");
+        c2b_print_usage(stderr);
         exit(EXIT_FAILURE);
     }
     memcpy(path, p, strlen(p) + 1);
@@ -1722,6 +1761,7 @@ c2b_test_dependencies()
         samtools = malloc(strlen(c2b_samtools) + 1);
         if (!samtools) {
             fprintf(stderr, "Error: Cannot allocate space for samtools variable copy\n");
+            c2b_print_usage(stderr);
             exit(EXIT_FAILURE);
         }
         memcpy(samtools, c2b_samtools, strlen(c2b_samtools) + 1);
@@ -1730,6 +1770,7 @@ c2b_test_dependencies()
         path_samtools = malloc(strlen(path) + 1);
         if (!path_samtools) {
             fprintf(stderr, "Error: Cannot allocate space for path (samtools) copy\n");
+            c2b_print_usage(stderr);
             exit(EXIT_FAILURE);
         }
         memcpy(path_samtools, path, strlen(path) + 1);
@@ -1740,6 +1781,7 @@ c2b_test_dependencies()
 
         if (c2b_print_matches(path_samtools, samtools) != kTrue) {
             fprintf(stderr, "Error: Cannot find samtools binary required for conversion of BAM and SAM format\n");
+            c2b_print_usage(stderr);
             exit(EXIT_FAILURE);
         }
         free(path_samtools), path_samtools = NULL;
@@ -1751,6 +1793,7 @@ c2b_test_dependencies()
         sort_bed = malloc(strlen(c2b_sort_bed) + 1);
         if (!sort_bed) {
             fprintf(stderr, "Error: Cannot allocate space for sort-bed variable copy\n");
+            c2b_print_usage(stderr);
             exit(EXIT_FAILURE);
         }
         memcpy(sort_bed, c2b_sort_bed, strlen(c2b_sort_bed) + 1);
@@ -1759,6 +1802,7 @@ c2b_test_dependencies()
         path_sort_bed = malloc(strlen(path) + 1);
         if (!path_sort_bed) {
             fprintf(stderr, "Error: Cannot allocate space for path (samtools) copy\n");
+            c2b_print_usage(stderr);
             exit(EXIT_FAILURE);
         }
         memcpy(path_sort_bed, path, strlen(path) + 1);
@@ -1769,6 +1813,7 @@ c2b_test_dependencies()
 
         if (c2b_print_matches(path_sort_bed, sort_bed) != kTrue) {
             fprintf(stderr, "Error: Cannot find sort-bed binary required for sorting BED output\n");
+            c2b_print_usage(stderr);
             exit(EXIT_FAILURE);
         }
         free(path_sort_bed), path_sort_bed = NULL;
@@ -1780,6 +1825,7 @@ c2b_test_dependencies()
         starch = malloc(strlen(c2b_starch) + 1);
         if (!starch) {
             fprintf(stderr, "Error: Cannot allocate space for starch variable copy\n");
+            c2b_print_usage(stderr);
             exit(EXIT_FAILURE);
         }
         memcpy(starch, c2b_starch, strlen(c2b_starch) + 1);
@@ -1788,6 +1834,7 @@ c2b_test_dependencies()
         path_starch = malloc(strlen(path) + 1);
         if (!path_starch) {
             fprintf(stderr, "Error: Cannot allocate space for path (starch) copy\n");
+            c2b_print_usage(stderr);
             exit(EXIT_FAILURE);
         }
         memcpy(path_starch, path, strlen(path) + 1);
@@ -1798,6 +1845,7 @@ c2b_test_dependencies()
 
         if (c2b_print_matches(path_starch, starch) != kTrue) {
             fprintf(stderr, "Error: Cannot find starch binary required for compression of BED output\n");
+            c2b_print_usage(stderr);
             exit(EXIT_FAILURE);
         }
         free(path_starch), path_starch = NULL;
@@ -1808,6 +1856,7 @@ c2b_test_dependencies()
     cat = malloc(strlen(c2b_cat) + 1);
     if (!cat) {
         fprintf(stderr, "Error: Cannot allocate space for cat variable copy\n");
+        c2b_print_usage(stderr);
         exit(EXIT_FAILURE);
     }
     memcpy(cat, c2b_cat, strlen(c2b_cat) + 1);
@@ -1816,12 +1865,14 @@ c2b_test_dependencies()
     path_cat = malloc(strlen(path) + 1);
     if (!path_cat) {
         fprintf(stderr, "Error: Cannot allocate space for path (cat) copy\n");
+        c2b_print_usage(stderr);
         exit(EXIT_FAILURE);
     }
     memcpy(path_cat, path, strlen(path) + 1);
     
     if (c2b_print_matches(path_cat, cat) != kTrue) {
         fprintf(stderr, "Error: Cannot find cat binary required for piping IO\n");
+        c2b_print_usage(stderr);
         exit(EXIT_FAILURE);
     }
     free(path_cat), path_cat = NULL;
@@ -1861,6 +1912,7 @@ c2b_print_matches(char *path, char *fn)
                 c2b_globals.samtools_path = malloc(strlen(candidate) + 1);
                 if (!c2b_globals.samtools_path) {
                     fprintf(stderr, "Error: Could not allocate space for storing samtools path global\n");
+                    c2b_print_usage(stderr);
                     exit(EXIT_FAILURE);
                 }
                 memcpy(c2b_globals.samtools_path, candidate, strlen(candidate) + 1);
@@ -1869,6 +1921,7 @@ c2b_print_matches(char *path, char *fn)
                 c2b_globals.sort_bed_path = malloc(strlen(candidate) + 1);
                 if (!c2b_globals.sort_bed_path) {
                     fprintf(stderr, "Error: Could not allocate space for storing sortbed path global\n");
+                    c2b_print_usage(stderr);
                     exit(EXIT_FAILURE);
                 }
                 memcpy(c2b_globals.sort_bed_path, candidate, strlen(candidate) + 1);
@@ -1877,6 +1930,7 @@ c2b_print_matches(char *path, char *fn)
                 c2b_globals.starch_path = malloc(strlen(candidate) + 1);
                 if (!c2b_globals.starch_path) {
                     fprintf(stderr, "Error: Could not allocate space for storing starch path global\n");
+                    c2b_print_usage(stderr);
                     exit(EXIT_FAILURE);
                 }
                 memcpy(c2b_globals.starch_path, candidate, strlen(candidate) + 1);
@@ -2063,6 +2117,7 @@ c2b_init_command_line_options(int argc, char **argv)
                 input_format = malloc(strlen(optarg) + 1);
                 if (!input_format) {
                     fprintf(stderr, "Error: Could not allocate space for input format argument\n");
+                    c2b_print_usage(stderr);
                     exit(EXIT_FAILURE);
                 }
                 memcpy(input_format, optarg, strlen(optarg) + 1);
@@ -2074,6 +2129,7 @@ c2b_init_command_line_options(int argc, char **argv)
                 output_format = malloc(strlen(optarg) + 1);
                 if (!output_format) {
                     fprintf(stderr, "Error: Could not allocate space for output format argument\n");
+                    c2b_print_usage(stderr);
                     exit(EXIT_FAILURE);
                 }
                 memcpy(output_format, optarg, strlen(optarg) + 1);
@@ -2085,6 +2141,7 @@ c2b_init_command_line_options(int argc, char **argv)
                 c2b_globals.max_mem_value = malloc(strlen(optarg) + 1);
                 if (!c2b_globals.max_mem_value) {
                     fprintf(stderr, "Error: Could not allocate space for sort-bed max-mem argument\n");
+                    c2b_print_usage(stderr);
                     exit(EXIT_FAILURE);
                 }
                 memcpy(c2b_globals.max_mem_value, optarg, strlen(optarg) + 1);
@@ -2093,6 +2150,7 @@ c2b_init_command_line_options(int argc, char **argv)
                 c2b_globals.sort_tmpdir_path = malloc(strlen(optarg) + 1);
                 if (!c2b_globals.sort_tmpdir_path) {
                     fprintf(stderr, "Error: Could not allocate space for sort-bed temporary directory argument\n");
+                    c2b_print_usage(stderr);
                     exit(EXIT_FAILURE);
                 }
                 memcpy(c2b_globals.sort_tmpdir_path, optarg, strlen(optarg) + 1);
@@ -2101,6 +2159,7 @@ c2b_init_command_line_options(int argc, char **argv)
                 c2b_globals.starch_note = malloc(strlen(optarg) + 1);
                 if (!c2b_globals.starch_note) {
                     fprintf(stderr, "Error: Could not allocate space for Starch note\n");
+                    c2b_print_usage(stderr);
                     exit(EXIT_FAILURE);
                 }
                 memcpy(c2b_globals.starch_note, optarg, strlen(optarg) + 1);
@@ -2148,6 +2207,7 @@ c2b_init_command_line_options(int argc, char **argv)
         c2b_globals.output_format = malloc(strlen(c2b_default_output_format) + 1);
         if (!c2b_globals.output_format) {
             fprintf(stderr, "Error: Could not allocate space for output format copy\n");
+            c2b_print_usage(stderr);
             exit(EXIT_FAILURE);
         }
         memcpy(c2b_globals.output_format, c2b_default_output_format, strlen(c2b_default_output_format) + 1);
@@ -2212,6 +2272,7 @@ c2b_to_lowercase(const char *src)
     p = malloc(strlen(src) + 1);
     if (!p) {
         fprintf(stderr, "Error: Could not allocate space for lowercase translation\n");
+        c2b_print_usage(stderr);
         exit(EXIT_FAILURE);
     }
     memcpy(p, src, strlen(src) + 1);
