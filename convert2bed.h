@@ -39,6 +39,8 @@ extern const char *c2b_sort_bed;
 const char *c2b_sort_bed = "sort-bed";
 extern const char *c2b_starch;
 const char *c2b_starch = "starch";
+extern const char *c2b_cat;
+const char *c2b_cat = "cat";
 
 extern const char *c2b_default_output_format;
 const char *c2b_default_output_format = "bed";
@@ -312,6 +314,7 @@ static struct globals {
     char *samtools_path;
     char *sort_bed_path;
     char *starch_path;
+    char *cat_path;
     boolean sort_flag;
     boolean all_reads_flag;
     boolean keep_header_flag;
@@ -358,7 +361,9 @@ extern "C" {
 #endif
 
     static void              c2b_init_conversion(c2b_pipeset_t *p);
+    static void              c2b_init_sam_conversion(c2b_pipeset_t *p);
     static void              c2b_init_bam_conversion(c2b_pipeset_t *p);
+    static inline void       c2b_cmd_cat_stdin(char *cmd);
     static inline void       c2b_cmd_bam_to_sam(char *cmd);
     static inline void       c2b_cmd_sort_bed(char *cmd);
     static inline void       c2b_cmd_starch_bed(char *cmd);
