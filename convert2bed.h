@@ -81,6 +81,14 @@ extern const int c2b_gff_field_max;
 const int c2b_gff_field_max = 9;
 extern const char *c2b_gff_zero_length_insertion_attribute;
 const char *c2b_gff_zero_length_insertion_attribute = ";zero_length_insertion=True";
+extern const int c2b_gtf_field_min;
+const int c2b_gtf_field_min = 9;
+extern const int c2b_gtf_field_max;
+const int c2b_gtf_field_max = 10;
+extern const char c2b_gtf_comment;
+const char c2b_gtf_comment = '#';
+extern const char *c2b_gtf_zero_length_insertion_attribute;
+const char *c2b_gtf_zero_length_insertion_attribute = "; zero_length_insertion=True";
 
 typedef int boolean;
 extern const boolean kTrue;
@@ -200,6 +208,41 @@ typedef struct gff {
     char *attributes;
     char *id;
 } c2b_gff_t;
+
+/* 
+   The GTF format is described at:
+
+   http://mblab.wustl.edu/GTF22.html
+
+   GTF fields are in the following ordering:
+
+   Index   GTF field
+   ---------------------------------------------------------
+   0       seqname
+   1       soure
+   2       feature
+   3       start
+   4       end
+   5       score
+   6       strand
+   7       frame
+   8       (optional) attributes
+   9       (optional) comments
+*/
+
+typedef struct gtf {
+    char *seqname;
+    char *source;
+    char *feature;
+    unsigned long long int start;
+    unsigned long long int end;
+    char *score;
+    char *strand;
+    char *frame;
+    char *attributes;
+    char *id;
+    char *comments;
+} c2b_gtf_t;
 
 /* 
    At most, we need 4 pipes to handle the most complex conversion
@@ -369,6 +412,7 @@ static struct globals {
     unsigned int header_line_idx;
     c2b_cigar_t *cigar;
     char *gff_id;
+    char *gtf_id;
 } c2b_globals;
 
 static struct option c2b_client_long_options[] = {
@@ -401,6 +445,7 @@ extern "C" {
     static void              c2b_init_conversion(c2b_pipeset_t *p);
     static void              c2b_init_bam_conversion(c2b_pipeset_t *p);
     static void              c2b_init_gff_conversion(c2b_pipeset_t *p);
+    static void              c2b_init_gtf_conversion(c2b_pipeset_t *p);
     static void              c2b_init_sam_conversion(c2b_pipeset_t *p);
     static inline void       c2b_cmd_cat_stdin(char *cmd);
     static inline void       c2b_cmd_bam_to_sam(char *cmd);
@@ -408,6 +453,8 @@ extern "C" {
     static inline void       c2b_cmd_starch_bed(char *cmd);
     static void              c2b_line_convert_gff_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
     static inline void       c2b_line_convert_gff_to_bed(c2b_gff_t g, char *dest_line);
+    static void              c2b_line_convert_gtf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
+    static inline void       c2b_line_convert_gtf_to_bed(c2b_gtf_t g, char *dest_line);
     static void              c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
     static void              c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *dest_size, char *src, ssize_t src_size); 
     static inline void       c2b_line_convert_sam_to_bed(c2b_sam_t s, char *dest_line);
