@@ -89,6 +89,10 @@ extern const char c2b_gtf_comment;
 const char c2b_gtf_comment = '#';
 extern const char *c2b_gtf_zero_length_insertion_attribute;
 const char *c2b_gtf_zero_length_insertion_attribute = "; zero_length_insertion=True";
+extern const int c2b_psl_field_min;
+const int c2b_psl_field_min = 21;
+extern const int c2b_psl_field_max;
+const int c2b_psl_field_max = 21;
 
 typedef int boolean;
 extern const boolean kTrue;
@@ -243,6 +247,62 @@ typedef struct gtf {
     char *id;
     char *comments;
 } c2b_gtf_t;
+
+/* 
+   The PSL format is described at:
+
+   http://genome.ucsc.edu/FAQ/FAQformat.html#format2
+
+   PSL fields are in the following ordering:
+
+   Index   PSL field
+   ---------------------------------------------------------
+   0       matches
+   1       misMatches
+   2       repMatches
+   3       nCount
+   4       qNumInsert
+   5       qBaseInsert
+   6       tNumInsert
+   7       tBaseInsert
+   8       strand
+   9       qName
+   10      qSize
+   11      qStart
+   12      qEnd
+   13      tName
+   14      tSize
+   15      tStart
+   16      tEnd
+   17      blockCount
+   18      blockSizes
+   19      qStarts
+   20      tStarts
+*/
+
+typedef struct psl {
+    unsigned long long int matches;
+    unsigned long long int misMatches;
+    unsigned long long int repMatches;
+    unsigned long long int nCount;
+    unsigned long long int qNumInsert;
+    unsigned long long int qBaseInsert;
+    unsigned long long int tNumInsert;
+    unsigned long long int tBaseInsert;
+    char *strand;
+    char *qName;
+    unsigned long long int qSize;
+    unsigned long long int qStart;
+    unsigned long long int qEnd;
+    char *tName;
+    unsigned long long int tSize;
+    unsigned long long int tStart;
+    unsigned long long int tEnd;
+    unsigned long long int blockCount;
+    char *blockSizes;
+    char *qStarts;
+    char *tStarts;
+} c2b_psl_t;
 
 /* 
    At most, we need 4 pipes to handle the most complex conversion
@@ -448,6 +508,7 @@ extern "C" {
     static void              c2b_init_bam_conversion(c2b_pipeset_t *p);
     static void              c2b_init_gff_conversion(c2b_pipeset_t *p);
     static void              c2b_init_gtf_conversion(c2b_pipeset_t *p);
+    static void              c2b_init_psl_conversion(c2b_pipeset_t *p);
     static void              c2b_init_sam_conversion(c2b_pipeset_t *p);
     static inline void       c2b_cmd_cat_stdin(char *cmd);
     static inline void       c2b_cmd_bam_to_sam(char *cmd);
@@ -457,6 +518,8 @@ extern "C" {
     static inline void       c2b_line_convert_gff_to_bed(c2b_gff_t g, char *dest_line);
     static void              c2b_line_convert_gtf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
     static inline void       c2b_line_convert_gtf_to_bed(c2b_gtf_t g, char *dest_line);
+    static void              c2b_line_convert_psl_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
+    static inline void       c2b_line_convert_psl_to_bed(c2b_psl_t p, char *dest_line);
     static void              c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
     static void              c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *dest_size, char *src, ssize_t src_size); 
     static inline void       c2b_line_convert_sam_to_bed(c2b_sam_t s, char *dest_line);

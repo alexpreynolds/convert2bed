@@ -59,6 +59,9 @@ c2b_init_conversion(c2b_pipeset_t *p)
         case GTF_FORMAT:
             c2b_init_gtf_conversion(p);
             break;
+        case PSL_FORMAT:
+            c2b_init_psl_conversion(p);
+            break;
         case SAM_FORMAT:
             c2b_init_sam_conversion(p);
             break;
@@ -791,6 +794,246 @@ c2b_init_gtf_conversion(c2b_pipeset_t *p)
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_init_gtf_conversion() - exit  ---\n");
+#endif
+}
+
+static void
+c2b_init_psl_conversion(c2b_pipeset_t *p)
+{
+#ifdef DEBUG
+    fprintf(stderr, "--- c2b_init_psl_conversion() - enter ---\n");
+#endif
+
+    pthread_t cat2psl_thread; 
+    pthread_t psl2bed_unsorted_thread; 
+    pthread_t bed_unsorted2stdout_thread;
+    pthread_t bed_unsorted2bed_sorted_thread;
+    pthread_t bed_sorted2stdout_thread;
+    pthread_t bed_sorted2starch_thread;
+    pthread_t starch2stdout_thread;
+    pid_t cat2psl_proc;
+    pid_t bed_unsorted2bed_sorted_proc;
+    pid_t bed_sorted2starch_proc;
+    c2b_pipeline_stage_t cat2psl_stage;
+    c2b_pipeline_stage_t psl2bed_unsorted_stage;
+    c2b_pipeline_stage_t bed_unsorted2stdout_stage;
+    c2b_pipeline_stage_t bed_unsorted2bed_sorted_stage;
+    c2b_pipeline_stage_t bed_sorted2stdout_stage;
+    c2b_pipeline_stage_t bed_sorted2starch_stage;
+    c2b_pipeline_stage_t starch2stdout_stage;
+    char cat2psl_cmd[MAX_LINE_LENGTH_VALUE] = {0};
+    char bed_unsorted2bed_sorted_cmd[MAX_LINE_LENGTH_VALUE] = {0};
+    char bed_sorted2starch_cmd[MAX_LINE_LENGTH_VALUE] = {0};
+    void (*psl2bed_unsorted_line_functor)(char *, ssize_t *, char *, ssize_t) = NULL;
+
+    psl2bed_unsorted_line_functor = c2b_line_convert_psl_to_bed_unsorted;
+
+    if ((!c2b_globals.sort_flag) && (c2b_globals.output_format_idx == BED_FORMAT)) {
+        cat2psl_stage.pipeset = p;
+        cat2psl_stage.line_functor = NULL;
+        cat2psl_stage.src = -1; /* src is really stdin */
+        cat2psl_stage.dest = 0;
+        
+        psl2bed_unsorted_stage.pipeset = p;
+        psl2bed_unsorted_stage.line_functor = psl2bed_unsorted_line_functor;
+        psl2bed_unsorted_stage.src = 0;
+        psl2bed_unsorted_stage.dest = 1;
+
+        bed_unsorted2stdout_stage.pipeset = p;
+        bed_unsorted2stdout_stage.line_functor = NULL;
+        bed_unsorted2stdout_stage.src = 1;
+        bed_unsorted2stdout_stage.dest = -1; /* dest BED is stdout */
+    }
+    else if (c2b_globals.output_format_idx == BED_FORMAT) {
+        cat2psl_stage.pipeset = p;
+        cat2psl_stage.line_functor = NULL;
+        cat2psl_stage.src = -1; /* src is really stdin */
+        cat2psl_stage.dest = 0;
+        
+        psl2bed_unsorted_stage.pipeset = p;
+        psl2bed_unsorted_stage.line_functor = psl2bed_unsorted_line_functor;
+        psl2bed_unsorted_stage.src = 0;
+        psl2bed_unsorted_stage.dest = 1;
+        
+        bed_unsorted2bed_sorted_stage.pipeset = p;
+        bed_unsorted2bed_sorted_stage.line_functor = NULL;
+        bed_unsorted2bed_sorted_stage.src = 1;
+        bed_unsorted2bed_sorted_stage.dest = 2;
+
+        bed_sorted2stdout_stage.pipeset = p;
+        bed_sorted2stdout_stage.line_functor = NULL;
+        bed_sorted2stdout_stage.src = 2;
+        bed_sorted2stdout_stage.dest = -1; /* dest BED is stdout */
+    }
+    else if (c2b_globals.output_format_idx == STARCH_FORMAT) {
+        cat2psl_stage.pipeset = p;
+        cat2psl_stage.line_functor = NULL;
+        cat2psl_stage.src = -1; /* src is really stdin */
+        cat2psl_stage.dest = 0;
+        
+        psl2bed_unsorted_stage.pipeset = p;
+        psl2bed_unsorted_stage.line_functor = psl2bed_unsorted_line_functor;
+        psl2bed_unsorted_stage.src = 0;
+        psl2bed_unsorted_stage.dest = 1;
+
+        bed_unsorted2bed_sorted_stage.pipeset = p;
+        bed_unsorted2bed_sorted_stage.line_functor = NULL;
+        bed_unsorted2bed_sorted_stage.src = 1;
+        bed_unsorted2bed_sorted_stage.dest = 2;
+
+        bed_sorted2starch_stage.pipeset = p;
+        bed_sorted2starch_stage.line_functor = NULL;
+        bed_sorted2starch_stage.src = 2;
+        bed_sorted2starch_stage.dest = 3;
+
+        starch2stdout_stage.pipeset = p;
+        starch2stdout_stage.line_functor = NULL;
+        starch2stdout_stage.src = 3;
+        starch2stdout_stage.dest = -1; /* dest Starch is stdout */
+    }
+    else {
+        fprintf(stderr, "Error: Unknown PSL conversion parameter combination\n");
+        c2b_print_usage(stderr);
+        exit(EXIT_FAILURE);
+    }
+
+    /*
+       We open pid_t (process) instances to handle data in a specified order. 
+    */
+
+    c2b_cmd_cat_stdin(cat2psl_cmd);
+#ifdef DEBUG
+    fprintf(stderr, "Debug: c2b_cmd_cat_stdin: [%s]\n", cat2psl_cmd);
+#endif
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+
+    cat2psl_proc = c2b_popen4(cat2psl_cmd,
+			      p->in[0],
+			      p->out[0],
+			      p->err[0],
+			      POPEN4_FLAG_NONE);
+
+#pragma GCC diagnostic pop
+
+    if (c2b_globals.sort_flag) {
+        c2b_cmd_sort_bed(bed_unsorted2bed_sorted_cmd);
+#ifdef DEBUG
+        fprintf(stderr, "Debug: c2b_cmd_sort_bed: [%s]\n", bed_unsorted2bed_sorted_cmd);
+#endif
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+        bed_unsorted2bed_sorted_proc = c2b_popen4(bed_unsorted2bed_sorted_cmd,
+                                                  p->in[2],
+                                                  p->out[2],
+                                                  p->err[2],
+                                                  POPEN4_FLAG_NONE);
+#pragma GCC diagnostic pop
+    }
+
+    if (c2b_globals.output_format_idx == STARCH_FORMAT) {
+        c2b_cmd_starch_bed(bed_sorted2starch_cmd);
+#ifdef DEBUG
+        fprintf(stderr, "Debug: c2b_cmd_starch_bed: [%s]\n", bed_sorted2starch_cmd);
+#endif
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+        bed_sorted2starch_proc = c2b_popen4(bed_sorted2starch_cmd,
+                                            p->in[3],
+                                            p->out[3],
+                                            p->err[3],
+                                            POPEN4_FLAG_NONE);
+#pragma GCC diagnostic pop
+    }
+
+#ifdef DEBUG
+    c2b_debug_pipeset(p, MAX_PIPES);
+#endif
+
+    /*
+       Once we have the desired process instances, we create and join
+       threads for their ordered execution.
+    */
+
+    if ((!c2b_globals.sort_flag) && (c2b_globals.output_format_idx == BED_FORMAT)) {
+        pthread_create(&cat2psl_thread,
+                       NULL,
+                       c2b_read_bytes_from_stdin,
+                       &cat2psl_stage);
+        pthread_create(&psl2bed_unsorted_thread,
+                       NULL,
+                       c2b_process_intermediate_bytes_by_lines,
+                       &psl2bed_unsorted_stage);
+        pthread_create(&bed_unsorted2stdout_thread,
+                       NULL,
+                       c2b_write_in_bytes_to_stdout,
+                       &bed_unsorted2stdout_stage);
+    }
+    else if (c2b_globals.output_format_idx == BED_FORMAT) {
+        pthread_create(&cat2psl_thread,
+                       NULL,
+                       c2b_read_bytes_from_stdin,
+                       &cat2psl_stage);
+        pthread_create(&psl2bed_unsorted_thread,
+                       NULL,
+                       c2b_process_intermediate_bytes_by_lines,
+                       &psl2bed_unsorted_stage);
+        pthread_create(&bed_unsorted2bed_sorted_thread,
+                       NULL,
+                       c2b_write_in_bytes_to_in_process,
+                       &bed_unsorted2bed_sorted_stage);
+        pthread_create(&bed_sorted2stdout_thread,
+                       NULL,
+                       c2b_write_out_bytes_to_stdout,
+                       &bed_sorted2stdout_stage);
+    }
+    else if (c2b_globals.output_format_idx == STARCH_FORMAT) {
+        pthread_create(&cat2psl_thread,
+                       NULL,
+                       c2b_read_bytes_from_stdin,
+                       &cat2psl_stage);
+        pthread_create(&psl2bed_unsorted_thread,
+                       NULL,
+                       c2b_process_intermediate_bytes_by_lines,
+                       &psl2bed_unsorted_stage);
+        pthread_create(&bed_unsorted2bed_sorted_thread,
+                       NULL,
+                       c2b_write_in_bytes_to_in_process,
+                       &bed_unsorted2bed_sorted_stage);
+        pthread_create(&bed_sorted2starch_thread,
+                       NULL,
+                       c2b_write_out_bytes_to_in_process,
+                       &bed_sorted2starch_stage);
+        pthread_create(&starch2stdout_thread,
+                       NULL,
+                       c2b_write_out_bytes_to_stdout,
+                       &starch2stdout_stage);
+    }
+
+    if ((!c2b_globals.sort_flag) && (c2b_globals.output_format_idx == BED_FORMAT)) {
+        pthread_join(cat2psl_thread, (void **) NULL);
+        pthread_join(psl2bed_unsorted_thread, (void **) NULL);
+        pthread_join(bed_unsorted2stdout_thread, (void **) NULL);
+    }
+    else if (c2b_globals.output_format_idx == BED_FORMAT) {
+        pthread_join(cat2psl_thread, (void **) NULL);
+        pthread_join(psl2bed_unsorted_thread, (void **) NULL);
+        pthread_join(bed_unsorted2bed_sorted_thread, (void **) NULL);
+        pthread_join(bed_sorted2stdout_thread, (void **) NULL);
+    }
+    else if (c2b_globals.output_format_idx == STARCH_FORMAT) {
+        pthread_join(cat2psl_thread, (void **) NULL);
+        pthread_join(psl2bed_unsorted_thread, (void **) NULL);
+        pthread_join(bed_unsorted2bed_sorted_thread, (void **) NULL);
+        pthread_join(bed_sorted2starch_thread, (void **) NULL);
+        pthread_join(starch2stdout_thread, (void **) NULL);
+    }
+
+#ifdef DEBUG
+    fprintf(stderr, "--- c2b_init_psl_conversion() - exit  ---\n");
 #endif
 }
 
@@ -1605,6 +1848,290 @@ c2b_line_convert_gff_to_bed(c2b_gff_t g, char *dest_line)
             g.type,
             g.phase,
             g.attributes);
+}
+
+static void
+c2b_line_convert_psl_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size)
+{
+    ssize_t psl_field_offsets[MAX_FIELD_LENGTH_VALUE] = {-1};
+    int psl_field_idx = 0;
+    ssize_t current_src_posn = -1;
+
+    while (++current_src_posn < src_size) {
+        if ((src[current_src_posn] == c2b_tab_delim) || (src[current_src_posn] == c2b_line_delim)) {
+            psl_field_offsets[psl_field_idx++] = current_src_posn;
+        }
+    }
+    psl_field_offsets[psl_field_idx] = src_size;
+
+    /* 
+       If number of fields is not in bounds, we may need to exit early
+    */
+
+    if (((psl_field_idx + 1) < c2b_psl_field_min) || ((psl_field_idx + 1) > c2b_psl_field_max)) {
+        if ((psl_field_idx == 0) || (psl_field_idx == 17)) {
+            if ((c2b_globals.headered_flag) && (c2b_globals.keep_header_flag) && (c2b_globals.header_line_idx <= 5)) {
+                /* copy header line to destination stream buffer */
+                char src_header_line_str[MAX_LINE_LENGTH_VALUE] = {0};
+                char dest_header_line_str[MAX_LINE_LENGTH_VALUE] = {0};
+                memcpy(src_header_line_str, src, src_size);
+                sprintf(dest_header_line_str, "%s\t%u\t%u\t%s\n", c2b_header_chr_name, c2b_globals.header_line_idx, (c2b_globals.header_line_idx + 1), src_header_line_str);
+                memcpy(dest + *dest_size, dest_header_line_str, strlen(dest_header_line_str));
+                *dest_size += strlen(dest_header_line_str);
+                c2b_globals.header_line_idx++;
+                return;                    
+            }
+            else if ((c2b_globals.headered_flag) && (c2b_globals.header_line_idx <= 5)) {
+                c2b_globals.header_line_idx++;
+                return;
+            }
+            else {
+                fprintf(stderr, "Error: Possible corrupt input on line %u -- if input is headered, use the --headered option\n", c2b_globals.header_line_idx);
+                c2b_print_usage(stderr);
+                exit(EXIT_FAILURE);
+            }
+        }
+        else {
+            fprintf(stderr, "Error: Invalid field count (%d) -- input file may not match input format\n", psl_field_idx);
+            c2b_print_usage(stderr);
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    /* 0 - matches */
+    char matches_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t matches_size = psl_field_offsets[0] - 1;
+    memcpy(matches_str, src, matches_size);
+    unsigned long long int matches_val = strtoull(matches_str, NULL, 10);
+
+    /* 1 - misMatches */
+    char misMatches_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t misMatches_size = psl_field_offsets[1] - psl_field_offsets[0] - 1;
+    memcpy(misMatches_str, src + psl_field_offsets[0] + 1, misMatches_size);
+    unsigned long long int misMatches_val = strtoull(misMatches_str, NULL, 10);
+
+    /* 2 - repMatches */
+    char repMatches_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t repMatches_size = psl_field_offsets[2] - psl_field_offsets[1] - 1;
+    memcpy(repMatches_str, src + psl_field_offsets[1] + 1, repMatches_size);
+    unsigned long long int repMatches_val = strtoull(repMatches_str, NULL, 10);
+
+    /* 3 - nCount */
+    char nCount_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t nCount_size = psl_field_offsets[3] - psl_field_offsets[2] - 1;
+    memcpy(nCount_str, src + psl_field_offsets[2] + 1, nCount_size);
+    unsigned long long int nCount_val = strtoull(nCount_str, NULL, 10);
+
+    /* 4 - qNumInsert */
+    char qNumInsert_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t qNumInsert_size = psl_field_offsets[4] - psl_field_offsets[3] - 1;
+    memcpy(qNumInsert_str, src + psl_field_offsets[3] + 1, qNumInsert_size);
+    unsigned long long int qNumInsert_val = strtoull(qNumInsert_str, NULL, 10);
+
+    /* 5 - qBaseInsert */
+    char qBaseInsert_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t qBaseInsert_size = psl_field_offsets[5] - psl_field_offsets[4] - 1;
+    memcpy(qBaseInsert_str, src + psl_field_offsets[4] + 1, qBaseInsert_size);
+    unsigned long long int qBaseInsert_val = strtoull(qBaseInsert_str, NULL, 10);
+
+    /* 6 - tNumInsert */
+    char tNumInsert_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t tNumInsert_size = psl_field_offsets[6] - psl_field_offsets[5] - 1;
+    memcpy(tNumInsert_str, src + psl_field_offsets[5] + 1, tNumInsert_size);
+    unsigned long long int tNumInsert_val = strtoull(tNumInsert_str, NULL, 10);
+
+    /* 7 - tBaseInsert */
+    char tBaseInsert_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t tBaseInsert_size = psl_field_offsets[7] - psl_field_offsets[6] - 1;
+    memcpy(tBaseInsert_str, src + psl_field_offsets[6] + 1, tBaseInsert_size);
+    unsigned long long int tBaseInsert_val = strtoull(tBaseInsert_str, NULL, 10);
+
+    /* 8 - strand */
+    char strand_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t strand_size = psl_field_offsets[8] - psl_field_offsets[7] - 1;
+    memcpy(strand_str, src + psl_field_offsets[7] + 1, strand_size);
+
+    /* 9 - qName */
+    char qName_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t qName_size = psl_field_offsets[9] - psl_field_offsets[8] - 1;
+    memcpy(qName_str, src + psl_field_offsets[8] + 1, qName_size);
+
+    /* 10 - qSize */
+    char qSize_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t qSize_size = psl_field_offsets[10] - psl_field_offsets[9] - 1;
+    memcpy(qSize_str, src + psl_field_offsets[9] + 1, qSize_size);
+    unsigned long long int qSize_val = strtoull(qSize_str, NULL, 10);
+
+    /* 11 - qStart */
+    char qStart_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t qStart_size = psl_field_offsets[11] - psl_field_offsets[10] - 1;
+    memcpy(qStart_str, src + psl_field_offsets[10] + 1, qStart_size);
+    unsigned long long int qStart_val = strtoull(qStart_str, NULL, 10);
+
+    /* 12 - qEnd */
+    char qEnd_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t qEnd_size = psl_field_offsets[12] - psl_field_offsets[11] - 1;
+    memcpy(qEnd_str, src + psl_field_offsets[11] + 1, qEnd_size);
+    unsigned long long int qEnd_val = strtoull(qEnd_str, NULL, 10);
+
+    /* 13 - tName */
+    char tName_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t tName_size = psl_field_offsets[13] - psl_field_offsets[12] - 1;
+    memcpy(tName_str, src + psl_field_offsets[12] + 1, tName_size);
+
+    /* 14 - tSize */
+    char tSize_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t tSize_size = psl_field_offsets[14] - psl_field_offsets[13] - 1;
+    memcpy(tSize_str, src + psl_field_offsets[13] + 1, tSize_size);
+    unsigned long long int tSize_val = strtoull(tSize_str, NULL, 10);
+
+    /* 15 - tStart */
+    char tStart_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t tStart_size = psl_field_offsets[15] - psl_field_offsets[14] - 1;
+    memcpy(tStart_str, src + psl_field_offsets[14] + 1, tStart_size);
+    unsigned long long int tStart_val = strtoull(tStart_str, NULL, 10);
+
+    /* 16 - tEnd */
+    char tEnd_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t tEnd_size = psl_field_offsets[16] - psl_field_offsets[15] - 1;
+    memcpy(tEnd_str, src + psl_field_offsets[15] + 1, tEnd_size);
+    unsigned long long int tEnd_val = strtoull(tEnd_str, NULL, 10);
+
+    /* 17 - blockCount */
+    char blockCount_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t blockCount_size = psl_field_offsets[17] - psl_field_offsets[16] - 1;
+    memcpy(blockCount_str, src + psl_field_offsets[16] + 1, blockCount_size);
+    unsigned long long int blockCount_val = strtoull(blockCount_str, NULL, 10);
+
+    /* 18 - blockSizes */
+    char blockSizes_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t blockSizes_size = psl_field_offsets[18] - psl_field_offsets[17] - 1;
+    memcpy(blockSizes_str, src + psl_field_offsets[17] + 1, blockSizes_size);
+
+    /* 19 - qStarts */
+    char qStarts_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t qStarts_size = psl_field_offsets[19] - psl_field_offsets[18] - 1;
+    memcpy(qStarts_str, src + psl_field_offsets[18] + 1, qStarts_size);
+
+    /* 20 - tStarts */
+    char tStarts_str[MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t tStarts_size = psl_field_offsets[20] - psl_field_offsets[19] - 1;
+    memcpy(tStarts_str, src + psl_field_offsets[19] + 1, tStarts_size);
+
+    c2b_psl_t psl;
+    psl.matches = matches_val;
+    psl.misMatches = misMatches_val;
+    psl.repMatches = repMatches_val;
+    psl.nCount = nCount_val;
+    psl.qNumInsert = qNumInsert_val;
+    psl.qBaseInsert = qBaseInsert_val;
+    psl.tNumInsert = tNumInsert_val;
+    psl.tBaseInsert = tBaseInsert_val;
+    psl.strand = strand_str;
+    psl.qName = qName_str;
+    psl.qSize = qSize_val;
+    psl.qStart = qStart_val;
+    psl.qEnd = qEnd_val;
+    psl.tName = tName_str;
+    psl.tSize = tSize_val;
+    psl.tStart = tStart_val;
+    psl.tEnd = tEnd_val;
+    psl.blockCount = blockCount_val;
+    psl.blockSizes = blockSizes_str;
+    psl.qStarts = qStarts_str;
+    psl.tStarts = tStarts_str;
+
+    /* 
+       Convert PSL struct to BED string and copy it to destination
+    */
+
+    char dest_line_str[MAX_LINE_LENGTH_VALUE] = {0};
+    c2b_line_convert_psl_to_bed(psl, dest_line_str);
+    memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
+    *dest_size += strlen(dest_line_str);    
+}
+
+static inline void
+c2b_line_convert_psl_to_bed(c2b_psl_t p, char *dest_line)
+{
+    /* 
+       For PSL-formatted data, we use the mapping provided by BEDOPS convention described at:
+
+       http://bedops.readthedocs.org/en/latest/content/reference/file-management/conversion/psl2bed.html
+
+       PSL field                 BED column index       BED field
+       -------------------------------------------------------------------------
+       tName                     1                      chromosome
+       tStart                    2                      start
+       tEnd                      3                      stop
+       qName                     4                      id
+       qSize                     5                      score
+       strand                    6                      strand
+
+       The remaining PSL columns are mapped as-is, in same order, to adjacent BED columns:
+
+       PSL field                 BED column index       BED field
+       -------------------------------------------------------------------------
+       matches                   7                      -
+       misMatches                8                      -
+       repMatches                9                      -
+       nCount                    10                     -
+       qNumInsert                11                     -
+       qBaseInsert               12                     -
+       tNumInsert                13                     -
+       tBaseInsert               14                     -
+       qStart                    15                     -
+       qEnd                      16                     -
+       tSize                     17                     -
+       blockCount                18                     -
+       blockSizes                19                     -
+       qStarts                   20                     -
+       tStarts                   21                     -
+    */
+
+    sprintf(dest_line,
+            "%s\t"                              \
+            "%" PRIu64 "\t"                     \
+            "%" PRIu64 "\t"                     \
+            "%s\t"                              \
+            "%" PRIu64 "\t"                     \
+            "%s\t"                              \
+            "%" PRIu64 "\t"                     \
+            "%" PRIu64 "\t"                     \
+            "%" PRIu64 "\t"                     \
+            "%" PRIu64 "\t"                     \
+            "%" PRIu64 "\t"                     \
+            "%" PRIu64 "\t"                     \
+            "%" PRIu64 "\t"                     \
+            "%" PRIu64 "\t"                     \
+            "%" PRIu64 "\t"                     \
+            "%" PRIu64 "\t"                     \
+            "%" PRIu64 "\t"                     \
+            "%" PRIu64 "\t"                     \
+            "%s\t"                              \
+            "%s\t"                              \
+            "%s\n",
+            p.tName,
+            p.tStart,
+            p.tEnd,
+            p.qName,
+            p.qSize,
+            p.strand,
+            p.matches,
+            p.misMatches,
+            p.repMatches,
+            p.nCount,
+            p.qNumInsert,
+            p.qBaseInsert,
+            p.tNumInsert,
+            p.tBaseInsert,
+            p.qStart,
+            p.qEnd,
+            p.tSize,
+            p.blockCount,
+            p.blockSizes,
+            p.qStarts,
+            p.tStarts);
 }
 
 static void
@@ -3115,6 +3642,9 @@ c2b_init_command_line_options(int argc, char **argv)
                 break;
             case 'a':
                 c2b_globals.all_reads_flag = kTrue;
+                break;
+            case 'p':
+                c2b_globals.headered_flag = kTrue;
                 break;
             case 'k':
                 c2b_globals.keep_header_flag = kTrue;
