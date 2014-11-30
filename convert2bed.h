@@ -345,7 +345,9 @@ static const char *usage = "\n" \
     "  --headered | -p\n" \
     "      Convert headered PSL input to BED (default is headerless)\n" \
     "  --keep-header | -k\n" \
-    "      Preserve header section as pseudo-BED elements (requires --headered)\n\n" \
+    "      Preserve header section as pseudo-BED elements (requires --headered)\n" \
+    "  --split | -s\n" \
+    "      Split record into multiple BED elements, based on tStarts field value\n\n" \
     "  VCF\n" \
     "  -----------------------------------------------------------------------\n" \
     "  --snvs | -v\n" \
