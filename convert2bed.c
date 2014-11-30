@@ -1037,13 +1037,30 @@ c2b_line_convert_gff_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
     }
 
     /* 
-       Parse ID value from attributes 
+       Parse ID value out from attributes string
     */
 
-    gff.id = NULL;
+    char *attributes_copy = NULL;
+    attributes_copy = malloc(strlen(attributes_str) + 1);
+    if (!attributes_copy) {
+        fprintf(stderr, "Error: Could not allocate space for GFF attributes copy\n");
+        exit(EXIT_FAILURE);
+    }
+    memcpy(attributes_copy, attributes_str, strlen(attributes_str) + 1);
+    const char *kv_tok;
+    const char *gff_id_prefix = "ID=";
+    char *id_str;
+    while((kv_tok = c2b_strsep(&attributes_copy, ";")) != NULL) {
+        id_str = strstr(kv_tok, gff_id_prefix);
+        if (id_str) {
+            memcpy(c2b_globals.gff_id, kv_tok + strlen(gff_id_prefix), strlen(kv_tok + strlen(gff_id_prefix)) + 1);
+        }
+    }
+    free(attributes_copy), attributes_copy = NULL;
+    gff.id = c2b_globals.gff_id;
 
     /* 
-       Convert GFF struct to BED string 
+       Convert GFF struct to BED string and copy it to destination
     */
 
     char dest_line_str[MAX_LINE_LENGTH_VALUE] = {0};
@@ -2473,6 +2490,7 @@ c2b_init_globals()
     c2b_globals.sort_tmpdir_path = NULL;
     c2b_globals.wig_basename = NULL;
     c2b_globals.cigar = NULL, c2b_sam_init_cigar_ops(&c2b_globals.cigar, MAX_OPERATIONS_VALUE);
+    c2b_globals.gff_id = NULL;
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_init_globals() - exit  ---\n");
@@ -2518,6 +2536,8 @@ c2b_delete_globals()
         free(c2b_globals.wig_basename), c2b_globals.wig_basename = NULL;
     if (c2b_globals.cigar)
         c2b_sam_delete_cigar_ops(c2b_globals.cigar);
+    if (c2b_globals.gff_id)
+        free(c2b_globals.gff_id), c2b_globals.gff_id = NULL;
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_delete_globals() - exit  ---\n");
@@ -2644,6 +2664,15 @@ c2b_init_command_line_options(int argc, char **argv)
         }
         memcpy(c2b_globals.output_format, c2b_default_output_format, strlen(c2b_default_output_format) + 1);
         c2b_globals.output_format_idx = c2b_to_output_format(c2b_globals.output_format);
+    }
+
+    if (c2b_globals.input_format_idx == GFF_FORMAT) {
+        c2b_globals.gff_id = malloc(MAX_FIELD_LENGTH_VALUE);
+        if (!c2b_globals.gff_id) {
+            fprintf(stderr, "Error: Could not allocate space for global GFF ID\n");
+            exit(EXIT_FAILURE);
+        }
+        memset(c2b_globals.gff_id, 0, MAX_FIELD_LENGTH_VALUE);
     }
 
     if ((c2b_globals.starch_bzip2_flag) && (c2b_globals.starch_gzip_flag)) {

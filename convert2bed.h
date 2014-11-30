@@ -368,6 +368,7 @@ static struct globals {
     char *wig_basename;
     unsigned int header_line_idx;
     c2b_cigar_t *cigar;
+    char *gff_id;
 } c2b_globals;
 
 static struct option c2b_client_long_options[] = {
