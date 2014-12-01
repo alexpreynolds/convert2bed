@@ -504,11 +504,12 @@ extern "C" {
 #endif
 
     static void              c2b_init_conversion(c2b_pipeset_t *p);
-    static void              c2b_init_bam_conversion(c2b_pipeset_t *p);
     static void              c2b_init_gff_conversion(c2b_pipeset_t *p);
     static void              c2b_init_gtf_conversion(c2b_pipeset_t *p);
     static void              c2b_init_psl_conversion(c2b_pipeset_t *p);
     static void              c2b_init_sam_conversion(c2b_pipeset_t *p);
+    static void              c2b_init_generic_conversion(c2b_pipeset_t *p, void(*to_bed_line_functor)(char *, ssize_t *, char *, ssize_t));
+    static void              c2b_init_bam_conversion(c2b_pipeset_t *p);
     static inline void       c2b_cmd_cat_stdin(char *cmd);
     static inline void       c2b_cmd_bam_to_sam(char *cmd);
     static inline void       c2b_cmd_sort_bed(char *cmd);
