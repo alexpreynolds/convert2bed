@@ -9,6 +9,7 @@
 #include <cassert>
 #include <cctype>
 #include <cinttypes>
+#include <cerrno>
 #else
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,6 +18,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <inttypes.h>
+#include <errno.h>
 #endif
 #include <unistd.h>
 #include <pthread.h>
@@ -26,12 +28,18 @@
 
 #define C2B_VERSION "1.0"
 
-#define MAX_FIELD_LENGTH_VALUE 2048
-#define MAX_OPERATION_FIELD_LENGTH_VALUE 24
-#define MAX_STRAND_LENGTH_VALUE 3
-#define MAX_LINE_LENGTH_VALUE 4096
-#define MAX_LINES_VALUE 64
-#define MAX_OPERATIONS_VALUE 64
+typedef int boolean;
+extern const boolean kTrue;
+extern const boolean kFalse;
+const boolean kTrue = 1;
+const boolean kFalse = 0;
+
+#define C2B_MAX_FIELD_LENGTH_VALUE 2048
+#define C2B_MAX_OPERATION_FIELD_LENGTH_VALUE 24
+#define C2B_MAX_STRAND_LENGTH_VALUE 3
+#define C2B_MAX_LINE_LENGTH_VALUE 4096
+#define C2B_MAX_LINES_VALUE 64
+#define C2B_MAX_OPERATIONS_VALUE 64
 
 extern const char *c2b_samtools;
 const char *c2b_samtools = "samtools";
@@ -93,12 +101,6 @@ extern const int c2b_psl_field_min;
 const int c2b_psl_field_min = 21;
 extern const int c2b_psl_field_max;
 const int c2b_psl_field_max = 21;
-
-typedef int boolean;
-extern const boolean kTrue;
-extern const boolean kFalse;
-const boolean kTrue = 1;
-const boolean kFalse = 0;
 
 /* 
    Allowed input and output formats
@@ -402,8 +404,6 @@ static const char *usage = "\n" \
     "      Preserve header section as pseudo-BED elements\n\n" \
     "  PSL\n" \
     "  -----------------------------------------------------------------------\n" \
-    "  --headered | -p\n" \
-    "      Convert headered PSL input to BED (default is headerless)\n" \
     "  --keep-header | -k\n" \
     "      Preserve header section as pseudo-BED elements (requires --headered)\n" \
     "  --split | -s\n" \
@@ -484,7 +484,6 @@ static struct option c2b_client_long_options[] = {
     { "all-reads",      no_argument,         NULL,    'a' },
     { "keep-header",    no_argument,         NULL,    'k' },
     { "split",          no_argument,         NULL,    's' },
-    { "headered",       no_argument,         NULL,    'p' },
     { "snvs",           no_argument,         NULL,    'v' },
     { "insertions",     no_argument,         NULL,    't' },
     { "deletions",      no_argument,         NULL,    'n' },
@@ -498,7 +497,7 @@ static struct option c2b_client_long_options[] = {
     { NULL,             no_argument,         NULL,     0  }
 };
 
-static const char *c2b_client_opt_string = "i:o:dakspvtnzge:m:r:b:h?";
+static const char *c2b_client_opt_string = "i:o:daksvtnzge:m:r:b:h?";
 
 #ifdef __cplusplus
 extern "C" {
