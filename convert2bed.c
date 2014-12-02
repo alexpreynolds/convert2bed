@@ -2010,7 +2010,7 @@ c2b_line_convert_vcf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
     ssize_t chrom_size = vcf_field_offsets[0];
     memcpy(chrom_str, src, chrom_size);
 
-    if (chrom_str[0] == c2b_vcf_header_prefix) {
+    if ((chrom_str[0] == c2b_vcf_header_prefix) && (c2b_globals.keep_header_flag)) {
         memcpy(src_header_line_str, src, src_size);
         sprintf(dest_header_line_str, "%s\t%u\t%u\t%s\n", c2b_header_chr_name, c2b_globals.header_line_idx, (c2b_globals.header_line_idx + 1), src_header_line_str);
         memcpy(dest + *dest_size, dest_header_line_str, strlen(dest_header_line_str));
@@ -2118,7 +2118,9 @@ c2b_line_convert_vcf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
 
         /* just print the one allele */
 
-        vcf.end = start_val + abs(ref_size - strlen(alt_str)) + 1;
+        if ((c2b_globals.vcf_filter_count == 1) && (!c2b_globals.vcf_insertions_flag)) {
+            vcf.end = start_val + abs(ref_size - strlen(alt_str)) + 1;
+        }
         if ( (c2b_globals.vcf_filter_count == 0) ||
              ((c2b_globals.vcf_snvs_flag) && (c2b_vcf_record_is_snv(ref_str, alt_str))) ||
              ((c2b_globals.vcf_insertions_flag) && (c2b_vcf_record_is_insertion(ref_str, alt_str))) ||
@@ -2140,7 +2142,7 @@ c2b_vcf_allele_is_id(char *s)
 static inline boolean
 c2b_vcf_record_is_snv(char *ref, char *alt) 
 {
-    return ((!c2b_vcf_allele_is_id(alt)) && ((strlen(ref) - strlen(alt)) == 0)) ? kTrue : kFalse;
+    return ((!c2b_vcf_allele_is_id(alt)) && (((int) strlen(ref) - (int) strlen(alt)) == 0)) ? kTrue : kFalse;
 }
 
 static inline boolean
@@ -2152,7 +2154,7 @@ c2b_vcf_record_is_insertion(char *ref, char *alt)
 static inline boolean
 c2b_vcf_record_is_deletion(char *ref, char *alt) 
 {
-    return ((!c2b_vcf_allele_is_id(alt)) && ((strlen(ref) - strlen(alt)) > 0)) ? kTrue : kFalse;
+    return ((!c2b_vcf_allele_is_id(alt)) && (((int) strlen(ref) - (int) strlen(alt)) > 0)) ? kTrue : kFalse;
 }
 
 static inline void
