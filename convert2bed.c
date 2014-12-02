@@ -1978,14 +1978,15 @@ c2b_line_convert_vcf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
     /* 
        If number of fields in not in bounds, we may need to exit early
     */
+    
+    char src_header_line_str[C2B_MAX_LINE_LENGTH_VALUE] = {0};
+    char dest_header_line_str[C2B_MAX_LINE_LENGTH_VALUE] = {0};
 
     if ((vcf_field_idx + 1) < c2b_vcf_field_min) {
         /* Legal header cases: line starts with "##" or "#" */
         if ((vcf_field_idx == 0) && (src[0] == c2b_vcf_header_prefix)) { 
             if (c2b_globals.keep_header_flag) { 
                 /* copy header line to destination stream buffer */
-                char src_header_line_str[C2B_MAX_LINE_LENGTH_VALUE] = {0};
-                char dest_header_line_str[C2B_MAX_LINE_LENGTH_VALUE] = {0};
                 memcpy(src_header_line_str, src, src_size);
                 sprintf(dest_header_line_str, "%s\t%u\t%u\t%s\n", c2b_header_chr_name, c2b_globals.header_line_idx, (c2b_globals.header_line_idx + 1), src_header_line_str);
                 memcpy(dest + *dest_size, dest_header_line_str, strlen(dest_header_line_str));
@@ -2006,8 +2007,17 @@ c2b_line_convert_vcf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
 
     /* 0 - CHROM */
     char chrom_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
-    ssize_t chrom_size = vcf_field_offsets[0] - 1;
+    ssize_t chrom_size = vcf_field_offsets[0];
     memcpy(chrom_str, src, chrom_size);
+
+    if (chrom_str[0] == c2b_vcf_header_prefix) {
+        memcpy(src_header_line_str, src, src_size);
+        sprintf(dest_header_line_str, "%s\t%u\t%u\t%s\n", c2b_header_chr_name, c2b_globals.header_line_idx, (c2b_globals.header_line_idx + 1), src_header_line_str);
+        memcpy(dest + *dest_size, dest_header_line_str, strlen(dest_header_line_str));
+        *dest_size += strlen(dest_header_line_str);
+        c2b_globals.header_line_idx++;
+        return;
+    }
 
     /* 1 - POS */
     char pos_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
@@ -2097,10 +2107,10 @@ c2b_line_convert_vcf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
                  ((c2b_globals.vcf_insertions_flag) && (c2b_vcf_record_is_insertion(ref_str, vcf.alt))) ||
                  ((c2b_globals.vcf_deletions_flag) && (c2b_vcf_record_is_deletion(ref_str, vcf.alt))) ) 
                 {
-                c2b_line_convert_vcf_to_bed(vcf, dest_line_str);
-                memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
-                *dest_size += strlen(dest_line_str);
-            }
+                    c2b_line_convert_vcf_to_bed(vcf, dest_line_str);
+                    memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
+                    *dest_size += strlen(dest_line_str);
+                }
         }
         free(alt_alleles_copy), alt_alleles_copy = NULL;
     }
@@ -2114,10 +2124,10 @@ c2b_line_convert_vcf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
              ((c2b_globals.vcf_insertions_flag) && (c2b_vcf_record_is_insertion(ref_str, alt_str))) ||
              ((c2b_globals.vcf_deletions_flag) && (c2b_vcf_record_is_deletion(ref_str, alt_str))) ) 
             {
-            c2b_line_convert_vcf_to_bed(vcf, dest_line_str);
-            memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
-            *dest_size += strlen(dest_line_str);
-        }
+                c2b_line_convert_vcf_to_bed(vcf, dest_line_str);
+                memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
+                *dest_size += strlen(dest_line_str);
+            }
     }
 }
 
