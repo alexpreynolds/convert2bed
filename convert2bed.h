@@ -34,12 +34,13 @@ extern const boolean kFalse;
 const boolean kTrue = 1;
 const boolean kFalse = 0;
 
+#define C2B_MAX_FIELD_COUNT_VALUE 64
 #define C2B_MAX_FIELD_LENGTH_VALUE 2048
 #define C2B_MAX_OPERATION_FIELD_LENGTH_VALUE 24
 #define C2B_MAX_STRAND_LENGTH_VALUE 3
-#define C2B_MAX_LINE_LENGTH_VALUE 4096
-#define C2B_MAX_LINES_VALUE 64
-#define C2B_MAX_OPERATIONS_VALUE 64
+#define C2B_MAX_LINE_LENGTH_VALUE 65536
+#define C2B_MAX_LINES_VALUE 32
+#define C2B_MAX_OPERATIONS_VALUE 32
 
 extern const char *c2b_samtools;
 extern const char *c2b_sort_bed;
@@ -181,8 +182,8 @@ typedef struct sam {
     int flag;
     char *strand;
     char *rname;
-    unsigned long long int start;
-    unsigned long long int stop;
+    uint64_t start;
+    uint64_t stop;
     char *mapq;
     char *cigar;
     char *rnext;
@@ -217,8 +218,8 @@ typedef struct gff {
     char *seqid;
     char *source;
     char *type;
-    unsigned long long int start;
-    unsigned long long int end;
+    uint64_t start;
+    uint64_t end;
     char *score;
     char *strand;
     char *phase;
@@ -251,8 +252,8 @@ typedef struct gtf {
     char *seqname;
     char *source;
     char *feature;
-    unsigned long long int start;
-    unsigned long long int end;
+    uint64_t start;
+    uint64_t end;
     char *score;
     char *strand;
     char *frame;
@@ -294,24 +295,24 @@ typedef struct gtf {
 */
 
 typedef struct psl {
-    unsigned long long int matches;
-    unsigned long long int misMatches;
-    unsigned long long int repMatches;
-    unsigned long long int nCount;
-    unsigned long long int qNumInsert;
-    unsigned long long int qBaseInsert;
-    unsigned long long int tNumInsert;
-    unsigned long long int tBaseInsert;
+    uint64_t matches;
+    uint64_t misMatches;
+    uint64_t repMatches;
+    uint64_t nCount;
+    uint64_t qNumInsert;
+    uint64_t qBaseInsert;
+    uint64_t tNumInsert;
+    uint64_t tBaseInsert;
     char *strand;
     char *qName;
-    unsigned long long int qSize;
-    unsigned long long int qStart;
-    unsigned long long int qEnd;
+    uint64_t qSize;
+    uint64_t qStart;
+    uint64_t qEnd;
     char *tName;
-    unsigned long long int tSize;
-    unsigned long long int tStart;
-    unsigned long long int tEnd;
-    unsigned long long int blockCount;
+    uint64_t tSize;
+    uint64_t tStart;
+    uint64_t tEnd;
+    uint64_t blockCount;
     char *blockSizes;
     char *qStarts;
     char *tStarts;
@@ -349,9 +350,9 @@ typedef struct psl {
 
 typedef struct vcf {
     char *chrom;
-    unsigned long long int pos;
-    unsigned long long int start;
-    unsigned long long int end;
+    uint64_t pos;
+    uint64_t start;
+    uint64_t end;
     char *id;
     char *ref;
     char *alt;

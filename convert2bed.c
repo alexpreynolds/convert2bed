@@ -15,7 +15,7 @@ main(int argc, char **argv)
     c2b_init_globals();
     c2b_init_command_line_options(argc, argv);
     /* check that stdin is available */
-    if ((stats_res = fstat(fileno(stdin), &stats)) < 0) {
+    if ((stats_res = fstat(STDIN_FILENO, &stats)) < 0) {
         fprintf(stderr, "Error: fstat() call failed");
         c2b_print_usage(stderr);
         return EXIT_FAILURE;
@@ -125,9 +125,12 @@ c2b_init_generic_conversion(c2b_pipeset_t *p, void(*to_bed_line_functor)(char *,
     pthread_t bed_sorted2stdout_thread;
     pthread_t bed_sorted2starch_thread;
     pthread_t starch2stdout_thread;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
     pid_t cat2generic_proc;
     pid_t bed_unsorted2bed_sorted_proc;
     pid_t bed_sorted2starch_proc;
+#pragma GCC diagnostic pop
     c2b_pipeline_stage_t cat2generic_stage;
     c2b_pipeline_stage_t generic2bed_unsorted_stage;
     c2b_pipeline_stage_t bed_unsorted2stdout_stage;
@@ -135,9 +138,9 @@ c2b_init_generic_conversion(c2b_pipeset_t *p, void(*to_bed_line_functor)(char *,
     c2b_pipeline_stage_t bed_sorted2stdout_stage;
     c2b_pipeline_stage_t bed_sorted2starch_stage;
     c2b_pipeline_stage_t starch2stdout_stage;
-    char cat2generic_cmd[C2B_MAX_LINE_LENGTH_VALUE] = {0};
-    char bed_unsorted2bed_sorted_cmd[C2B_MAX_LINE_LENGTH_VALUE] = {0};
-    char bed_sorted2starch_cmd[C2B_MAX_LINE_LENGTH_VALUE] = {0};
+    char cat2generic_cmd[C2B_MAX_LINE_LENGTH_VALUE];
+    char bed_unsorted2bed_sorted_cmd[C2B_MAX_LINE_LENGTH_VALUE];
+    char bed_sorted2starch_cmd[C2B_MAX_LINE_LENGTH_VALUE];
     void (*generic2bed_unsorted_line_functor)(char *, ssize_t *, char *, ssize_t) = to_bed_line_functor;
 
     if ((!c2b_globals.sort_flag) && (c2b_globals.output_format_idx == BED_FORMAT)) {
@@ -363,9 +366,12 @@ c2b_init_bam_conversion(c2b_pipeset_t *p)
     pthread_t bed_sorted2stdout_thread;
     pthread_t bed_sorted2starch_thread;
     pthread_t starch2stdout_thread;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
     pid_t bam2sam_proc;
     pid_t bed_unsorted2bed_sorted_proc;
     pid_t bed_sorted2starch_proc;
+#pragma GCC diagnostic pop
     c2b_pipeline_stage_t bam2sam_stage;
     c2b_pipeline_stage_t sam2bed_unsorted_stage;
     c2b_pipeline_stage_t bed_unsorted2stdout_stage;
@@ -373,9 +379,9 @@ c2b_init_bam_conversion(c2b_pipeset_t *p)
     c2b_pipeline_stage_t bed_sorted2stdout_stage;
     c2b_pipeline_stage_t bed_sorted2starch_stage;
     c2b_pipeline_stage_t starch2stdout_stage;
-    char bam2sam_cmd[C2B_MAX_LINE_LENGTH_VALUE] = {0};
-    char bed_unsorted2bed_sorted_cmd[C2B_MAX_LINE_LENGTH_VALUE] = {0};
-    char bed_sorted2starch_cmd[C2B_MAX_LINE_LENGTH_VALUE] = {0};
+    char bam2sam_cmd[C2B_MAX_LINE_LENGTH_VALUE];
+    char bed_unsorted2bed_sorted_cmd[C2B_MAX_LINE_LENGTH_VALUE];
+    char bed_sorted2starch_cmd[C2B_MAX_LINE_LENGTH_VALUE];
     void (*sam2bed_unsorted_line_functor)(char *, ssize_t *, char *, ssize_t) = NULL;
 
     sam2bed_unsorted_line_functor = (!c2b_globals.split_flag ?
@@ -602,6 +608,7 @@ c2b_cmd_cat_stdin(char *cmd)
     memcpy(cmd + strlen(c2b_globals.cat_path),
            cat_args,
            strlen(cat_args));
+    cmd[strlen(c2b_globals.cat_path) + strlen(cat_args)] = '\0';
 }
 
 static inline void
@@ -616,26 +623,29 @@ c2b_cmd_bam_to_sam(char *cmd)
     memcpy(cmd + strlen(c2b_globals.samtools_path), 
            bam2sam_args, 
            strlen(bam2sam_args));
+    cmd[strlen(c2b_globals.samtools_path) + strlen(bam2sam_args)] = '\0';
 }
 
 static inline void
 c2b_cmd_sort_bed(char *cmd)
 {
-    char sort_bed_args[C2B_MAX_LINE_LENGTH_VALUE] = {0};
+    char sort_bed_args[C2B_MAX_LINE_LENGTH_VALUE];
 
     /* /path/to/sort-bed [--max-mem <val>] [--tmpdir <path>] - */
     if (c2b_globals.max_mem_value) {
-        memcpy(sort_bed_args + strlen(sort_bed_args),
+        memcpy(sort_bed_args,
                sort_bed_max_mem_arg, 
                strlen(sort_bed_max_mem_arg));
         memcpy(sort_bed_args + strlen(sort_bed_args), 
                c2b_globals.max_mem_value, 
                strlen(c2b_globals.max_mem_value));
+        sort_bed_args[strlen(sort_bed_max_mem_arg) + strlen(sort_bed_args)] = '\0';
     }
     else {
         memcpy(sort_bed_args, 
                sort_bed_max_mem_default_arg, 
                strlen(sort_bed_max_mem_default_arg));
+        sort_bed_args[strlen(sort_bed_max_mem_default_arg)] = '\0';
     }
     if (c2b_globals.sort_tmpdir_path) {
         memcpy(sort_bed_args + strlen(sort_bed_args),
@@ -644,10 +654,12 @@ c2b_cmd_sort_bed(char *cmd)
         memcpy(sort_bed_args + strlen(sort_bed_args),
                c2b_globals.sort_tmpdir_path,
                strlen(c2b_globals.sort_tmpdir_path));
+        sort_bed_args[strlen(sort_bed_args) + strlen(c2b_globals.sort_tmpdir_path)] = '\0';
     }
     memcpy(sort_bed_args + strlen(sort_bed_args),
            sort_bed_stdin,
            strlen(sort_bed_stdin));
+    sort_bed_args[strlen(sort_bed_args) + strlen(sort_bed_stdin)] = '\0';
 
     /* cmd */
     memcpy(cmd, 
@@ -656,23 +668,26 @@ c2b_cmd_sort_bed(char *cmd)
     memcpy(cmd + strlen(c2b_globals.sort_bed_path), 
            sort_bed_args, 
            strlen(sort_bed_args));
+    cmd[strlen(c2b_globals.sort_bed_path) + strlen(sort_bed_args)] = '\0';
 }
 
 static inline void
 c2b_cmd_starch_bed(char *cmd) 
 {
-    char starch_args[C2B_MAX_LINE_LENGTH_VALUE] = {0};
+    char starch_args[C2B_MAX_LINE_LENGTH_VALUE];
 
     /* /path/to/starch [--bzip2 | --gzip] [--note="xyz..."] - */
     if (c2b_globals.starch_bzip2_flag) {
         memcpy(starch_args,
                starch_bzip2_arg,
                strlen(starch_bzip2_arg));
+        starch_args[strlen(starch_bzip2_arg)] = '\0';
     }
     else if (c2b_globals.starch_gzip_flag) {
         memcpy(starch_args + strlen(starch_args),
                starch_gzip_arg,
                strlen(starch_gzip_arg));
+        starch_args[strlen(starch_gzip_arg)] = '\0';
     }
 
 #ifdef DEBUG
@@ -691,10 +706,12 @@ c2b_cmd_starch_bed(char *cmd)
         memcpy(starch_args + strlen(starch_args),
                starch_note_suffix_arg,
                strlen(starch_note_suffix_arg));
+        starch_args[strlen(starch_args) + strlen(starch_note_prefix_arg) + strlen(c2b_globals.starch_note) + strlen(starch_note_suffix_arg)] = '\0';
     }
     memcpy(starch_args + strlen(starch_args),
            starch_stdin_arg,
            strlen(starch_stdin_arg));
+    starch_args[strlen(starch_args) + strlen(starch_stdin_arg)] = '\0';
 
 #ifdef DEBUG
     fprintf(stderr, "Debug: starch_args: [%s]\n", starch_args);
@@ -707,12 +724,13 @@ c2b_cmd_starch_bed(char *cmd)
     memcpy(cmd + strlen(c2b_globals.starch_path), 
            starch_args, 
            strlen(starch_args));
+    cmd[strlen(c2b_globals.starch_path) + strlen(starch_args)] = '\0';
 }
 
 static void
 c2b_line_convert_gtf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size)
 {
-    ssize_t gtf_field_offsets[C2B_MAX_FIELD_LENGTH_VALUE] = {-1};
+    ssize_t gtf_field_offsets[C2B_MAX_FIELD_LENGTH_VALUE];
     int gtf_field_idx = 0;
     ssize_t current_src_posn = -1;
 
@@ -722,6 +740,7 @@ c2b_line_convert_gtf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
         }
     }
     gtf_field_offsets[gtf_field_idx] = src_size;
+    gtf_field_offsets[gtf_field_idx + 1] = -1;
 
     /* 
        If number of fields is not in bounds, we may need to exit early
@@ -735,9 +754,10 @@ c2b_line_convert_gtf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
                 }
                 else {
                     /* copy header line to destination stream buffer */
-                    char src_header_line_str[C2B_MAX_LINE_LENGTH_VALUE] = {0};
-                    char dest_header_line_str[C2B_MAX_LINE_LENGTH_VALUE] = {0};
+                    char src_header_line_str[C2B_MAX_LINE_LENGTH_VALUE];
+                    char dest_header_line_str[C2B_MAX_LINE_LENGTH_VALUE];
                     memcpy(src_header_line_str, src, src_size);
+                    src_header_line_str[src_size] = '\0';
                     sprintf(dest_header_line_str, "%s\t%u\t%u\t%s\n", c2b_header_chr_name, c2b_globals.header_line_idx, (c2b_globals.header_line_idx + 1), src_header_line_str);
                     memcpy(dest + *dest_size, dest_header_line_str, strlen(dest_header_line_str));
                     *dest_size += strlen(dest_header_line_str);
@@ -757,58 +777,68 @@ c2b_line_convert_gtf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
     }
 
     /* 0 - seqname */
-    char seqname_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char seqname_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t seqname_size = gtf_field_offsets[0];
     memcpy(seqname_str, src, seqname_size);
+    seqname_str[seqname_size] = '\0';
 
     /* 1 - source */
-    char source_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char source_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t source_size = gtf_field_offsets[1] - gtf_field_offsets[0] - 1;
     memcpy(source_str, src + gtf_field_offsets[0] + 1, source_size);
+    source_str[source_size] = '\0';
 
     /* 2 - feature */
-    char feature_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char feature_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t feature_size = gtf_field_offsets[2] - gtf_field_offsets[1] - 1;
     memcpy(feature_str, src + gtf_field_offsets[1] + 1, feature_size);
+    feature_str[feature_size] = '\0';
 
     /* 3 - start */
-    char start_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char start_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t start_size = gtf_field_offsets[3] - gtf_field_offsets[2] - 1;
     memcpy(start_str, src + gtf_field_offsets[2] + 1, start_size);
-    unsigned long long int start_val = strtoull(start_str, NULL, 10);
+    start_str[start_size] = '\0';
+    uint64_t start_val = strtoull(start_str, NULL, 10);
 
     /* 4 - end */
-    char end_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char end_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t end_size = gtf_field_offsets[4] - gtf_field_offsets[3] - 1;
     memcpy(end_str, src + gtf_field_offsets[3] + 1, end_size);
-    unsigned long long int end_val = strtoull(end_str, NULL, 10);
+    end_str[end_size] = '\0';
+    uint64_t end_val = strtoull(end_str, NULL, 10);
 
     /* 5 - score */
-    char score_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char score_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t score_size = gtf_field_offsets[5] - gtf_field_offsets[4] - 1;
     memcpy(score_str, src + gtf_field_offsets[4] + 1, score_size);
+    score_str[score_size] = '\0';
 
     /* 6 - strand */
-    char strand_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char strand_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t strand_size = gtf_field_offsets[6] - gtf_field_offsets[5] - 1;
     memcpy(strand_str, src + gtf_field_offsets[5] + 1, strand_size);
+    strand_str[strand_size] = '\0';
 
     /* 7 - frame */
-    char frame_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char frame_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t frame_size = gtf_field_offsets[7] - gtf_field_offsets[6] - 1;
     memcpy(frame_str, src + gtf_field_offsets[6] + 1, frame_size);
+    frame_str[frame_size] = '\0';
 
     /* 8 - attributes */
-    char attributes_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char attributes_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t attributes_size = gtf_field_offsets[8] - gtf_field_offsets[7] - 1;
     memcpy(attributes_str, src + gtf_field_offsets[7] + 1, attributes_size);
+    attributes_str[attributes_size] = '\0';
 
     /* 9 - comments */
-    char comments_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char comments_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t comments_size = 0;
     if (gtf_field_idx == 9) {
         comments_size = gtf_field_offsets[9] - gtf_field_offsets[8] - 1;
         memcpy(comments_str, src + gtf_field_offsets[8] + 1, comments_size);
+        comments_str[comments_size] = '\0';
     }
 
     c2b_gtf_t gtf;
@@ -865,7 +895,7 @@ c2b_line_convert_gtf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
        Convert GTF struct to BED string and copy it to destination
     */
 
-    char dest_line_str[C2B_MAX_LINE_LENGTH_VALUE] = {0};
+    char dest_line_str[C2B_MAX_LINE_LENGTH_VALUE];
     c2b_line_convert_gtf_to_bed(gtf, dest_line_str);
     memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
     *dest_size += strlen(dest_line_str);
@@ -957,7 +987,7 @@ c2b_line_convert_gtf_to_bed(c2b_gtf_t g, char *dest_line)
 static void
 c2b_line_convert_gff_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size)
 {
-    ssize_t gff_field_offsets[C2B_MAX_FIELD_LENGTH_VALUE] = {-1};
+    ssize_t gff_field_offsets[C2B_MAX_FIELD_LENGTH_VALUE];
     int gff_field_idx = 0;
     ssize_t current_src_posn = -1;
 
@@ -967,6 +997,7 @@ c2b_line_convert_gff_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
         }
     }
     gff_field_offsets[gff_field_idx] = src_size;
+    gff_field_offsets[gff_field_idx + 1] = -1;
 
     /* 
        If number of fields is not in bounds, we may need to exit early
@@ -974,17 +1005,19 @@ c2b_line_convert_gff_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
 
     if (((gff_field_idx + 1) < c2b_gff_field_min) || ((gff_field_idx + 1) > c2b_gff_field_max)) {
         if (gff_field_idx == 0) {
-            char non_interval_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+            char non_interval_str[C2B_MAX_FIELD_LENGTH_VALUE];
             memcpy(non_interval_str, src, current_src_posn);
+            non_interval_str[current_src_posn] = '\0';
             if (strcmp(non_interval_str, c2b_gff_header) == 0) {
                 if (!c2b_globals.keep_header_flag) {
                     return;
                 }
                 else {
                     /* copy header line to destination stream buffer */
-                    char src_header_line_str[C2B_MAX_LINE_LENGTH_VALUE] = {0};
-                    char dest_header_line_str[C2B_MAX_LINE_LENGTH_VALUE] = {0};
+                    char src_header_line_str[C2B_MAX_LINE_LENGTH_VALUE];
+                    char dest_header_line_str[C2B_MAX_LINE_LENGTH_VALUE];
                     memcpy(src_header_line_str, src, src_size);
+                    src_header_line_str[src_size] = '\0';
                     sprintf(dest_header_line_str, "%s\t%u\t%u\t%s\n", c2b_header_chr_name, c2b_globals.header_line_idx, (c2b_globals.header_line_idx + 1), src_header_line_str);
                     memcpy(dest + *dest_size, dest_header_line_str, strlen(dest_header_line_str));
                     *dest_size += strlen(dest_header_line_str);
@@ -1007,51 +1040,60 @@ c2b_line_convert_gff_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
     }
 
     /* 0 - seqid */
-    char seqid_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char seqid_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t seqid_size = gff_field_offsets[0];
     memcpy(seqid_str, src, seqid_size);
+    seqid_str[seqid_size] = '\0';
 
     /* 1 - source */
-    char source_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char source_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t source_size = gff_field_offsets[1] - gff_field_offsets[0] - 1;
     memcpy(source_str, src + gff_field_offsets[0] + 1, source_size);
+    source_str[source_size] = '\0';
 
     /* 2 - type */
-    char type_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char type_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t type_size = gff_field_offsets[2] - gff_field_offsets[1] - 1;
     memcpy(type_str, src + gff_field_offsets[1] + 1, type_size);
+    type_str[type_size] = '\0';
 
     /* 3 - start */
-    char start_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char start_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t start_size = gff_field_offsets[3] - gff_field_offsets[2] - 1;
     memcpy(start_str, src + gff_field_offsets[2] + 1, start_size);
-    unsigned long long int start_val = strtoull(start_str, NULL, 10);
+    start_str[start_size] = '\0';
+    uint64_t start_val = strtoull(start_str, NULL, 10);
 
     /* 4 - end */
-    char end_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char end_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t end_size = gff_field_offsets[4] - gff_field_offsets[3] - 1;
     memcpy(end_str, src + gff_field_offsets[3] + 1, end_size);
-    unsigned long long int end_val = strtoull(end_str, NULL, 10);
+    end_str[end_size] = '\0';
+    uint64_t end_val = strtoull(end_str, NULL, 10);
 
     /* 5 - score */
-    char score_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char score_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t score_size = gff_field_offsets[5] - gff_field_offsets[4] - 1;
     memcpy(score_str, src + gff_field_offsets[4] + 1, score_size);
+    score_str[score_size] = '\0';
 
     /* 6 - strand */
-    char strand_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char strand_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t strand_size = gff_field_offsets[6] - gff_field_offsets[5] - 1;
     memcpy(strand_str, src + gff_field_offsets[5] + 1, strand_size);
+    strand_str[strand_size] = '\0';
 
     /* 7 - phase */
-    char phase_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char phase_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t phase_size = gff_field_offsets[7] - gff_field_offsets[6] - 1;
     memcpy(phase_str, src + gff_field_offsets[6] + 1, phase_size);
+    phase_str[phase_size] = '\0';
 
     /* 8 - attributes */
-    char attributes_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char attributes_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t attributes_size = gff_field_offsets[8] - gff_field_offsets[7] - 1;
     memcpy(attributes_str, src + gff_field_offsets[7] + 1, attributes_size);
+    attributes_str[attributes_size] = '\0';
 
     c2b_gff_t gff;
     gff.seqid = seqid_str;
@@ -1105,7 +1147,7 @@ c2b_line_convert_gff_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
        Convert GFF struct to BED string and copy it to destination
     */
 
-    char dest_line_str[C2B_MAX_LINE_LENGTH_VALUE] = {0};
+    char dest_line_str[C2B_MAX_LINE_LENGTH_VALUE];
     c2b_line_convert_gff_to_bed(gff, dest_line_str);
     memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
     *dest_size += strlen(dest_line_str);
@@ -1164,7 +1206,7 @@ c2b_line_convert_gff_to_bed(c2b_gff_t g, char *dest_line)
 static void
 c2b_line_convert_psl_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size)
 {
-    ssize_t psl_field_offsets[C2B_MAX_FIELD_LENGTH_VALUE] = {-1};
+    ssize_t psl_field_offsets[C2B_MAX_FIELD_LENGTH_VALUE];
     int psl_field_idx = 0;
     ssize_t current_src_posn = -1;
 
@@ -1174,6 +1216,7 @@ c2b_line_convert_psl_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
         }
     }
     psl_field_offsets[psl_field_idx] = src_size;
+    psl_field_offsets[psl_field_idx + 1] = -1;
 
     /* 
        If number of fields is not in bounds, we may need to exit early
@@ -1183,9 +1226,10 @@ c2b_line_convert_psl_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
         if ((psl_field_idx == 0) || (psl_field_idx == 17)) {
             if ((c2b_globals.headered_flag) && (c2b_globals.keep_header_flag) && (c2b_globals.header_line_idx <= 5)) {
                 /* copy header line to destination stream buffer */
-                char src_header_line_str[C2B_MAX_LINE_LENGTH_VALUE] = {0};
-                char dest_header_line_str[C2B_MAX_LINE_LENGTH_VALUE] = {0};
+                char src_header_line_str[C2B_MAX_LINE_LENGTH_VALUE];
+                char dest_header_line_str[C2B_MAX_LINE_LENGTH_VALUE];
                 memcpy(src_header_line_str, src, src_size);
+                src_header_line_str[src_size] = '\0';
                 sprintf(dest_header_line_str, "%s\t%u\t%u\t%s\n", c2b_header_chr_name, c2b_globals.header_line_idx, (c2b_globals.header_line_idx + 1), src_header_line_str);
                 memcpy(dest + *dest_size, dest_header_line_str, strlen(dest_header_line_str));
                 *dest_size += strlen(dest_header_line_str);
@@ -1210,10 +1254,11 @@ c2b_line_convert_psl_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
     }
 
     /* 0 - matches */
-    char matches_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char matches_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t matches_size = psl_field_offsets[0] - 1;
     memcpy(matches_str, src, matches_size);
-    unsigned long long int matches_val = strtoull(matches_str, NULL, 10);
+    matches_str[matches_size] = '\0';
+    uint64_t matches_val = strtoull(matches_str, NULL, 10);
 
     /* 
        We test if matches is a number or string, as one of the header 
@@ -1223,9 +1268,10 @@ c2b_line_convert_psl_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
     if ((matches_val == 0) && (!isdigit(matches_str[0]))) {
         if ((c2b_globals.headered_flag) && (c2b_globals.keep_header_flag) && (c2b_globals.header_line_idx <= 5)) {
             /* copy header line to destination stream buffer */
-            char src_header_line_str[C2B_MAX_LINE_LENGTH_VALUE] = {0};
-            char dest_header_line_str[C2B_MAX_LINE_LENGTH_VALUE] = {0};
+            char src_header_line_str[C2B_MAX_LINE_LENGTH_VALUE];
+            char dest_header_line_str[C2B_MAX_LINE_LENGTH_VALUE];
             memcpy(src_header_line_str, src, src_size);
+            src_header_line_str[src_size] = '\0';
             sprintf(dest_header_line_str, "%s\t%u\t%u\t%s\n", c2b_header_chr_name, c2b_globals.header_line_idx, (c2b_globals.header_line_idx + 1), src_header_line_str);
             memcpy(dest + *dest_size, dest_header_line_str, strlen(dest_header_line_str));
             *dest_size += strlen(dest_header_line_str);
@@ -1235,118 +1281,138 @@ c2b_line_convert_psl_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
     }
 
     /* 1 - misMatches */
-    char misMatches_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char misMatches_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t misMatches_size = psl_field_offsets[1] - psl_field_offsets[0] - 1;
     memcpy(misMatches_str, src + psl_field_offsets[0] + 1, misMatches_size);
-    unsigned long long int misMatches_val = strtoull(misMatches_str, NULL, 10);
+    misMatches_str[misMatches_size] = '\0';
+    uint64_t misMatches_val = strtoull(misMatches_str, NULL, 10);
 
     /* 2 - repMatches */
-    char repMatches_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char repMatches_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t repMatches_size = psl_field_offsets[2] - psl_field_offsets[1] - 1;
     memcpy(repMatches_str, src + psl_field_offsets[1] + 1, repMatches_size);
-    unsigned long long int repMatches_val = strtoull(repMatches_str, NULL, 10);
+    repMatches_str[repMatches_size] = '\0';
+    uint64_t repMatches_val = strtoull(repMatches_str, NULL, 10);
 
     /* 3 - nCount */
-    char nCount_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char nCount_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t nCount_size = psl_field_offsets[3] - psl_field_offsets[2] - 1;
     memcpy(nCount_str, src + psl_field_offsets[2] + 1, nCount_size);
-    unsigned long long int nCount_val = strtoull(nCount_str, NULL, 10);
+    nCount_str[nCount_size] = '\0';
+    uint64_t nCount_val = strtoull(nCount_str, NULL, 10);
 
     /* 4 - qNumInsert */
-    char qNumInsert_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char qNumInsert_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t qNumInsert_size = psl_field_offsets[4] - psl_field_offsets[3] - 1;
     memcpy(qNumInsert_str, src + psl_field_offsets[3] + 1, qNumInsert_size);
-    unsigned long long int qNumInsert_val = strtoull(qNumInsert_str, NULL, 10);
+    qNumInsert_str[qNumInsert_size] = '\0';
+    uint64_t qNumInsert_val = strtoull(qNumInsert_str, NULL, 10);
 
     /* 5 - qBaseInsert */
-    char qBaseInsert_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char qBaseInsert_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t qBaseInsert_size = psl_field_offsets[5] - psl_field_offsets[4] - 1;
     memcpy(qBaseInsert_str, src + psl_field_offsets[4] + 1, qBaseInsert_size);
-    unsigned long long int qBaseInsert_val = strtoull(qBaseInsert_str, NULL, 10);
+    qBaseInsert_str[qBaseInsert_size] = '\0';
+    uint64_t qBaseInsert_val = strtoull(qBaseInsert_str, NULL, 10);
 
     /* 6 - tNumInsert */
-    char tNumInsert_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char tNumInsert_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t tNumInsert_size = psl_field_offsets[6] - psl_field_offsets[5] - 1;
     memcpy(tNumInsert_str, src + psl_field_offsets[5] + 1, tNumInsert_size);
-    unsigned long long int tNumInsert_val = strtoull(tNumInsert_str, NULL, 10);
+    tNumInsert_str[tNumInsert_size] = '\0';
+    uint64_t tNumInsert_val = strtoull(tNumInsert_str, NULL, 10);
 
     /* 7 - tBaseInsert */
-    char tBaseInsert_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char tBaseInsert_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t tBaseInsert_size = psl_field_offsets[7] - psl_field_offsets[6] - 1;
     memcpy(tBaseInsert_str, src + psl_field_offsets[6] + 1, tBaseInsert_size);
-    unsigned long long int tBaseInsert_val = strtoull(tBaseInsert_str, NULL, 10);
+    tBaseInsert_str[tBaseInsert_size] = '\0';
+    uint64_t tBaseInsert_val = strtoull(tBaseInsert_str, NULL, 10);
 
     /* 8 - strand */
-    char strand_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char strand_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t strand_size = psl_field_offsets[8] - psl_field_offsets[7] - 1;
     memcpy(strand_str, src + psl_field_offsets[7] + 1, strand_size);
+    strand_str[strand_size] = '\0';
 
     /* 9 - qName */
-    char qName_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char qName_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t qName_size = psl_field_offsets[9] - psl_field_offsets[8] - 1;
     memcpy(qName_str, src + psl_field_offsets[8] + 1, qName_size);
+    qName_str[qName_size] = '\0';
 
     /* 10 - qSize */
-    char qSize_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char qSize_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t qSize_size = psl_field_offsets[10] - psl_field_offsets[9] - 1;
     memcpy(qSize_str, src + psl_field_offsets[9] + 1, qSize_size);
-    unsigned long long int qSize_val = strtoull(qSize_str, NULL, 10);
+    qSize_str[qSize_size] = '\0';
+    uint64_t qSize_val = strtoull(qSize_str, NULL, 10);
 
     /* 11 - qStart */
-    char qStart_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char qStart_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t qStart_size = psl_field_offsets[11] - psl_field_offsets[10] - 1;
     memcpy(qStart_str, src + psl_field_offsets[10] + 1, qStart_size);
-    unsigned long long int qStart_val = strtoull(qStart_str, NULL, 10);
+    qStart_str[qStart_size] = '\0';
+    uint64_t qStart_val = strtoull(qStart_str, NULL, 10);
 
     /* 12 - qEnd */
-    char qEnd_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char qEnd_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t qEnd_size = psl_field_offsets[12] - psl_field_offsets[11] - 1;
     memcpy(qEnd_str, src + psl_field_offsets[11] + 1, qEnd_size);
-    unsigned long long int qEnd_val = strtoull(qEnd_str, NULL, 10);
+    qEnd_str[qEnd_size] = '\0';
+    uint64_t qEnd_val = strtoull(qEnd_str, NULL, 10);
 
     /* 13 - tName */
-    char tName_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char tName_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t tName_size = psl_field_offsets[13] - psl_field_offsets[12] - 1;
     memcpy(tName_str, src + psl_field_offsets[12] + 1, tName_size);
+    tName_str[tName_size] = '\0';
 
     /* 14 - tSize */
-    char tSize_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char tSize_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t tSize_size = psl_field_offsets[14] - psl_field_offsets[13] - 1;
     memcpy(tSize_str, src + psl_field_offsets[13] + 1, tSize_size);
-    unsigned long long int tSize_val = strtoull(tSize_str, NULL, 10);
+    tSize_str[tSize_size] = '\0';
+    uint64_t tSize_val = strtoull(tSize_str, NULL, 10);
 
     /* 15 - tStart */
-    char tStart_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char tStart_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t tStart_size = psl_field_offsets[15] - psl_field_offsets[14] - 1;
     memcpy(tStart_str, src + psl_field_offsets[14] + 1, tStart_size);
-    unsigned long long int tStart_val = strtoull(tStart_str, NULL, 10);
+    tStart_str[tStart_size] = '\0';
+    uint64_t tStart_val = strtoull(tStart_str, NULL, 10);
 
     /* 16 - tEnd */
-    char tEnd_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char tEnd_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t tEnd_size = psl_field_offsets[16] - psl_field_offsets[15] - 1;
     memcpy(tEnd_str, src + psl_field_offsets[15] + 1, tEnd_size);
-    unsigned long long int tEnd_val = strtoull(tEnd_str, NULL, 10);
+    tEnd_str[tEnd_size] = '\0';
+    uint64_t tEnd_val = strtoull(tEnd_str, NULL, 10);
 
     /* 17 - blockCount */
-    char blockCount_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char blockCount_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t blockCount_size = psl_field_offsets[17] - psl_field_offsets[16] - 1;
     memcpy(blockCount_str, src + psl_field_offsets[16] + 1, blockCount_size);
-    unsigned long long int blockCount_val = strtoull(blockCount_str, NULL, 10);
+    blockCount_str[blockCount_size] = '\0';
+    uint64_t blockCount_val = strtoull(blockCount_str, NULL, 10);
 
     /* 18 - blockSizes */
-    char blockSizes_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char blockSizes_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t blockSizes_size = psl_field_offsets[18] - psl_field_offsets[17] - 1;
     memcpy(blockSizes_str, src + psl_field_offsets[17] + 1, blockSizes_size);
+    blockSizes_str[blockSizes_size] = '\0';
 
     /* 19 - qStarts */
-    char qStarts_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char qStarts_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t qStarts_size = psl_field_offsets[19] - psl_field_offsets[18] - 1;
     memcpy(qStarts_str, src + psl_field_offsets[18] + 1, qStarts_size);
+    qStarts_str[qStarts_size] = '\0';
 
     /* 20 - tStarts */
-    char tStarts_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char tStarts_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t tStarts_size = psl_field_offsets[20] - psl_field_offsets[19] - 1;
     memcpy(tStarts_str, src + psl_field_offsets[19] + 1, tStarts_size);
+    tStarts_str[tStarts_size] = '\0';
 
     c2b_psl_t psl;
     psl.matches = matches_val;
@@ -1375,7 +1441,7 @@ c2b_line_convert_psl_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
        Convert PSL struct to BED string and copy it to destination
     */
 
-    char dest_line_str[C2B_MAX_LINE_LENGTH_VALUE] = {0};
+    char dest_line_str[C2B_MAX_LINE_LENGTH_VALUE];
     c2b_line_convert_psl_to_bed(psl, dest_line_str);
     memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
     *dest_size += strlen(dest_line_str);    
@@ -1473,7 +1539,7 @@ c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t
        tab-offset list to grab fields in the correct order.
     */
 
-    ssize_t sam_field_offsets[C2B_MAX_FIELD_LENGTH_VALUE] = {-1};
+    ssize_t sam_field_offsets[C2B_MAX_FIELD_COUNT_VALUE];
     int sam_field_idx = 0;
     ssize_t current_src_posn = -1;
     
@@ -1488,9 +1554,10 @@ c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t
         }
         else {
             /* copy header line to destination stream buffer */
-            char src_header_line_str[C2B_MAX_LINE_LENGTH_VALUE] = {0};
-            char dest_header_line_str[C2B_MAX_LINE_LENGTH_VALUE] = {0};
+            char src_header_line_str[C2B_MAX_LINE_LENGTH_VALUE];
+            char dest_header_line_str[C2B_MAX_LINE_LENGTH_VALUE];
             memcpy(src_header_line_str, src, src_size);
+            src_header_line_str[src_size] = '\0';
             sprintf(dest_header_line_str, "%s\t%u\t%u\t%s\n", c2b_header_chr_name, c2b_globals.header_line_idx, (c2b_globals.header_line_idx + 1), src_header_line_str);
             memcpy(dest + *dest_size, dest_header_line_str, strlen(dest_header_line_str));
             *dest_size += strlen(dest_header_line_str);
@@ -1505,6 +1572,7 @@ c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t
         }
     }
     sam_field_offsets[sam_field_idx] = src_size;
+    sam_field_offsets[sam_field_idx + 1] = -1;
 
     /* 
        If no more than one field is read in, then something went wrong
@@ -1521,8 +1589,9 @@ c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t
     */
 
     ssize_t flag_size = sam_field_offsets[1] - sam_field_offsets[0];
-    char flag_src_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char flag_src_str[C2B_MAX_FIELD_LENGTH_VALUE];
     memcpy(flag_src_str, src + sam_field_offsets[0] + 1, flag_size);
+    flag_src_str[flag_size] = '\0';
     int flag_val = (int) strtol(flag_src_str, NULL, 10);
     boolean is_mapped = (boolean) !(4 & flag_val);
     if ((!is_mapped) && (!c2b_globals.all_reads_flag)) 
@@ -1535,35 +1604,38 @@ c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t
         *dest_size += rname_size;
     }
     else {
-        char unmapped_read_chr_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+        char unmapped_read_chr_str[C2B_MAX_FIELD_LENGTH_VALUE];
         memcpy(unmapped_read_chr_str, c2b_unmapped_read_chr_name, strlen(c2b_unmapped_read_chr_name));
         unmapped_read_chr_str[strlen(c2b_unmapped_read_chr_name)] = '\t';
+        unmapped_read_chr_str[strlen(c2b_unmapped_read_chr_name) + 1] = '\0';
         memcpy(dest + *dest_size, unmapped_read_chr_str, strlen(unmapped_read_chr_str));
         *dest_size += strlen(unmapped_read_chr_str);
     }
 
     /* Field 2 - POS - 1 */
     ssize_t pos_size = sam_field_offsets[3] - sam_field_offsets[2];
-    char pos_src_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char pos_src_str[C2B_MAX_FIELD_LENGTH_VALUE];
     memcpy(pos_src_str, src + sam_field_offsets[2] + 1, pos_size - 1);
-    unsigned long long int pos_val = strtoull(pos_src_str, NULL, 10);
-    char start_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
-    sprintf(start_str, "%llu\t", (is_mapped) ? pos_val - 1 : 0);
+    pos_src_str[pos_size - 1] = '\0';
+    uint64_t pos_val = strtoull(pos_src_str, NULL, 10);
+    char start_str[C2B_MAX_FIELD_LENGTH_VALUE];
+    sprintf(start_str, "%" PRIu64 "\t", (is_mapped) ? pos_val - 1 : 0);
     memcpy(dest + *dest_size, start_str, strlen(start_str));
     *dest_size += strlen(start_str);
 
     /* Field 3 - POS + length(CIGAR) - 1 */
     ssize_t cigar_size = sam_field_offsets[5] - sam_field_offsets[4];
     ssize_t cigar_length = 0;
-    char stop_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
-    char cigar_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char stop_str[C2B_MAX_FIELD_LENGTH_VALUE];
+    char cigar_str[C2B_MAX_FIELD_LENGTH_VALUE];
     memcpy(cigar_str, src + sam_field_offsets[4] + 1, cigar_size - 1);
+    cigar_str[cigar_size - 1] = '\0';
     c2b_sam_cigar_str_to_ops(cigar_str);
     ssize_t block_idx = 0;
     for (block_idx = 0; block_idx < c2b_globals.cigar->length; ++block_idx) {
         cigar_length += c2b_globals.cigar->ops[block_idx].bases;
     }
-    sprintf(stop_str, "%llu\t", (is_mapped) ? pos_val + cigar_length - 1 : 1);
+    sprintf(stop_str, "%" PRIu64 "\t", (is_mapped) ? pos_val + cigar_length - 1 : 1);
     memcpy(dest + *dest_size, stop_str, strlen(stop_str));
     *dest_size += strlen(stop_str);
 
@@ -1578,7 +1650,7 @@ c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t
 
     /* Field 6 - 16 & FLAG */
     int strand_val = 0x10 & flag_val;
-    char strand_str[C2B_MAX_STRAND_LENGTH_VALUE] = {0};
+    char strand_str[C2B_MAX_STRAND_LENGTH_VALUE];
     sprintf(strand_str, "%c\t", (strand_val == 0x10) ? '-' : '+');
     memcpy(dest + *dest_size, strand_str, strlen(strand_str));
     *dest_size += strlen(strand_str);
@@ -1638,7 +1710,7 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
        parse it for operation key-value pairs to loop through later on
     */
 
-    ssize_t sam_field_offsets[C2B_MAX_FIELD_LENGTH_VALUE] = {-1};
+    ssize_t sam_field_offsets[C2B_MAX_FIELD_LENGTH_VALUE];
     int sam_field_idx = 0;
     ssize_t current_src_posn = -1;
 
@@ -1653,9 +1725,10 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
         }
         else {
             /* copy header line to destination stream buffer */
-            char src_header_line_str[C2B_MAX_LINE_LENGTH_VALUE] = {0};
-            char dest_header_line_str[C2B_MAX_LINE_LENGTH_VALUE] = {0};
+            char src_header_line_str[C2B_MAX_LINE_LENGTH_VALUE];
+            char dest_header_line_str[C2B_MAX_LINE_LENGTH_VALUE];
             memcpy(src_header_line_str, src, src_size);
+            src_header_line_str[src_size] = '\0';
             sprintf(dest_header_line_str, "%s\t%u\t%u\t%s\n", c2b_header_chr_name, c2b_globals.header_line_idx, (c2b_globals.header_line_idx + 1), src_header_line_str);
             memcpy(dest + *dest_size, dest_header_line_str, strlen(dest_header_line_str));
             *dest_size += strlen(dest_header_line_str);
@@ -1670,6 +1743,7 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
         }
     }
     sam_field_offsets[sam_field_idx] = src_size;
+    sam_field_offsets[sam_field_idx + 1] = -1;
 
     /* 
        If no more than one field is read in, then something went wrong
@@ -1686,8 +1760,9 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
     */
 
     ssize_t cigar_size = sam_field_offsets[5] - sam_field_offsets[4];
-    char cigar_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char cigar_str[C2B_MAX_FIELD_LENGTH_VALUE];
     memcpy(cigar_str, src + sam_field_offsets[4] + 1, cigar_size - 1);
+    cigar_str[cigar_size - 1] = '\0';
     c2b_sam_cigar_str_to_ops(cigar_str);
 #ifdef DEBUG
     c2b_sam_debug_cigar_ops(c2b_globals.cigar);
@@ -1703,8 +1778,9 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
     */
 
     ssize_t flag_size = sam_field_offsets[1] - sam_field_offsets[0];
-    char flag_src_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char flag_src_str[C2B_MAX_FIELD_LENGTH_VALUE];
     memcpy(flag_src_str, src + sam_field_offsets[0] + 1, flag_size);
+    flag_src_str[flag_size] = '\0';
     int flag_val = (int) strtol(flag_src_str, NULL, 10);
     boolean is_mapped = (boolean) !(4 & flag_val);
     if ((!is_mapped) && (!c2b_globals.all_reads_flag)) 
@@ -1715,73 +1791,85 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
     */
 
     /* RNAME */
-    char rname_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char rname_str[C2B_MAX_FIELD_LENGTH_VALUE];
     if (is_mapped) {
         ssize_t rname_size = sam_field_offsets[2] - sam_field_offsets[1] - 1;
         memcpy(rname_str, src + sam_field_offsets[1] + 1, rname_size);
+        rname_str[rname_size] = '\0';
     }
     else {
-        char unmapped_read_chr_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+        char unmapped_read_chr_str[C2B_MAX_FIELD_LENGTH_VALUE];
         memcpy(unmapped_read_chr_str, c2b_unmapped_read_chr_name, strlen(c2b_unmapped_read_chr_name));
         unmapped_read_chr_str[strlen(c2b_unmapped_read_chr_name)] = '\t';
+        unmapped_read_chr_str[strlen(c2b_unmapped_read_chr_name) + 1] = '\0';
         memcpy(rname_str, unmapped_read_chr_str, strlen(unmapped_read_chr_str));
+        rname_str[strlen(unmapped_read_chr_str)] = '\0';
     }
 
     /* POS */
     ssize_t pos_size = sam_field_offsets[3] - sam_field_offsets[2];
-    char pos_src_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char pos_src_str[C2B_MAX_FIELD_LENGTH_VALUE];
     memcpy(pos_src_str, src + sam_field_offsets[2] + 1, pos_size - 1);
-    unsigned long long int pos_val = strtoull(pos_src_str, NULL, 10);
-    unsigned long long int start_val = pos_val - 1; /* remember, start = POS - 1 */
-    unsigned long long int stop_val = start_val + cigar_length;
+    pos_src_str[pos_size - 1] = '\0';
+    uint64_t pos_val = strtoull(pos_src_str, NULL, 10);
+    uint64_t start_val = pos_val - 1; /* remember, start = POS - 1 */
+    uint64_t stop_val = start_val + cigar_length;
 
     /* QNAME */
-    char qname_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char qname_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t qname_size = sam_field_offsets[0];
     memcpy(qname_str, src, qname_size);
+    qname_str[qname_size] = '\0';
 
     /* 16 & FLAG */
     int strand_val = 0x10 & flag_val;
-    char strand_str[C2B_MAX_STRAND_LENGTH_VALUE] = {0};
+    char strand_str[C2B_MAX_STRAND_LENGTH_VALUE];
     sprintf(strand_str, "%c", (strand_val == 0x10) ? '-' : '+');
     
     /* MAPQ */
-    char mapq_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char mapq_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t mapq_size = sam_field_offsets[4] - sam_field_offsets[3] - 1;
     memcpy(mapq_str, src + sam_field_offsets[3] + 1, mapq_size);
+    mapq_str[mapq_size] = '\0';
     
     /* RNEXT */
-    char rnext_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char rnext_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t rnext_size = sam_field_offsets[6] - sam_field_offsets[5] - 1;
     memcpy(rnext_str, src + sam_field_offsets[5] + 1, rnext_size);
+    rnext_str[rnext_size] = '\0';
 
     /* PNEXT */
-    char pnext_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char pnext_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t pnext_size = sam_field_offsets[7] - sam_field_offsets[6] - 1;
     memcpy(pnext_str, src + sam_field_offsets[6] + 1, pnext_size);
+    pnext_str[pnext_size] = '\0';
 
     /* TLEN */
-    char tlen_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char tlen_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t tlen_size = sam_field_offsets[8] - sam_field_offsets[7] - 1;
     memcpy(tlen_str, src + sam_field_offsets[7] + 1, tlen_size);
+    tlen_str[tlen_size] = '\0';
 
     /* SEQ */
-    char seq_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char seq_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t seq_size = sam_field_offsets[9] - sam_field_offsets[8] - 1;
     memcpy(seq_str, src + sam_field_offsets[8] + 1, seq_size);
+    seq_str[seq_size] = '\0';
 
     /* QUAL */
-    char qual_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char qual_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t qual_size = sam_field_offsets[10] - sam_field_offsets[9] - 1;
     memcpy(qual_str, src + sam_field_offsets[9] + 1, qual_size);
+    qual_str[qual_size] = '\0';
 
     /* Optional fields */
-    char opt_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char opt_str[C2B_MAX_FIELD_LENGTH_VALUE];
     if (sam_field_offsets[11] != -1) {
         for (int field_idx = 11; field_idx <= sam_field_idx; field_idx++) {
             ssize_t opt_size = sam_field_offsets[field_idx] - sam_field_offsets[field_idx - 1] - (field_idx == sam_field_idx ? 1 : 0);
             memcpy(opt_str + strlen(opt_str), src + sam_field_offsets[field_idx - 1] + 1, opt_size);
         }
+        opt_str[strlen(opt_str)] = '\0';
     }
 
     /* 
@@ -1808,7 +1896,7 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
     sam.qual = qual_str;
     sam.opt = opt_str;
 
-    char dest_line_str[C2B_MAX_LINE_LENGTH_VALUE] = {0};
+    char dest_line_str[C2B_MAX_LINE_LENGTH_VALUE];
     
     for (op_idx = 0, block_idx = 1; op_idx < c2b_globals.cigar->length; ++op_idx) {
         char current_op = c2b_globals.cigar->ops[op_idx].operation;
@@ -1964,7 +2052,7 @@ c2b_line_convert_sam_to_bed(c2b_sam_t s, char *dest_line)
 static void
 c2b_line_convert_vcf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size)
 {
-    ssize_t vcf_field_offsets[C2B_MAX_FIELD_LENGTH_VALUE] = {-1};
+    ssize_t vcf_field_offsets[C2B_MAX_FIELD_LENGTH_VALUE];
     int vcf_field_idx = 0;
     ssize_t current_src_posn = -1;
 
@@ -1974,13 +2062,14 @@ c2b_line_convert_vcf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
         }
     }
     vcf_field_offsets[vcf_field_idx] = src_size;
+    vcf_field_offsets[vcf_field_idx + 1] = -1;
 
     /* 
        If number of fields in not in bounds, we may need to exit early
     */
     
-    char src_header_line_str[C2B_MAX_LINE_LENGTH_VALUE] = {0};
-    char dest_header_line_str[C2B_MAX_LINE_LENGTH_VALUE] = {0};
+    char src_header_line_str[C2B_MAX_LINE_LENGTH_VALUE];
+    char dest_header_line_str[C2B_MAX_LINE_LENGTH_VALUE];
 
     if ((vcf_field_idx + 1) < c2b_vcf_field_min) {
         /* Legal header cases: line starts with "##" or "#" */
@@ -1988,6 +2077,7 @@ c2b_line_convert_vcf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
             if (c2b_globals.keep_header_flag) { 
                 /* copy header line to destination stream buffer */
                 memcpy(src_header_line_str, src, src_size);
+                src_header_line_str[src_size] = '\0';
                 sprintf(dest_header_line_str, "%s\t%u\t%u\t%s\n", c2b_header_chr_name, c2b_globals.header_line_idx, (c2b_globals.header_line_idx + 1), src_header_line_str);
                 memcpy(dest + *dest_size, dest_header_line_str, strlen(dest_header_line_str));
                 *dest_size += strlen(dest_header_line_str);
@@ -2006,12 +2096,14 @@ c2b_line_convert_vcf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
     }
 
     /* 0 - CHROM */
-    char chrom_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char chrom_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t chrom_size = vcf_field_offsets[0];
     memcpy(chrom_str, src, chrom_size);
+    chrom_str[chrom_size] = '\0';
 
     if ((chrom_str[0] == c2b_vcf_header_prefix) && (c2b_globals.keep_header_flag)) {
         memcpy(src_header_line_str, src, src_size);
+        src_header_line_str[src_size] = '\0';
         sprintf(dest_header_line_str, "%s\t%u\t%u\t%s\n", c2b_header_chr_name, c2b_globals.header_line_idx, (c2b_globals.header_line_idx + 1), src_header_line_str);
         memcpy(dest + *dest_size, dest_header_line_str, strlen(dest_header_line_str));
         *dest_size += strlen(dest_header_line_str);
@@ -2020,53 +2112,65 @@ c2b_line_convert_vcf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
     }
 
     /* 1 - POS */
-    char pos_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char pos_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t pos_size = vcf_field_offsets[1] - vcf_field_offsets[0] - 1;
     memcpy(pos_str, src + vcf_field_offsets[0] + 1, pos_size);
-    unsigned long long int pos_val = strtoull(pos_str, NULL, 10);
-    unsigned long long int start_val = pos_val - 1;
-    unsigned long long int end_val = pos_val; /* note that this value may change below, depending on options */
+    pos_str[pos_size] = '\0';
+    uint64_t pos_val = strtoull(pos_str, NULL, 10);
+    uint64_t start_val = pos_val - 1;
+    uint64_t end_val = pos_val; /* note that this value may change below, depending on options */
 
     /* 2 - ID */
-    char id_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char id_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t id_size = vcf_field_offsets[2] - vcf_field_offsets[1] - 1;
     memcpy(id_str, src + vcf_field_offsets[1] + 1, id_size);
+    id_str[id_size] = '\0';
 
     /* 3 - REF */
-    char ref_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char ref_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t ref_size = vcf_field_offsets[3] - vcf_field_offsets[2] - 1;
     memcpy(ref_str, src + vcf_field_offsets[2] + 1, ref_size);
+    ref_str[ref_size] = '\0';
 
     /* 4 - ALT */
-    char alt_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char alt_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t alt_size = vcf_field_offsets[4] - vcf_field_offsets[3] - 1;
     memcpy(alt_str, src + vcf_field_offsets[3] + 1, alt_size);
+    alt_str[alt_size] = '\0';
 
     /* 5 - QUAL */
-    char qual_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char qual_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t qual_size = vcf_field_offsets[5] - vcf_field_offsets[4] - 1;
     memcpy(qual_str, src + vcf_field_offsets[4] + 1, qual_size);
+    qual_str[qual_size] = '\0';
 
     /* 6 - FILTER */
-    char filter_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char filter_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t filter_size = vcf_field_offsets[6] - vcf_field_offsets[5] - 1;
     memcpy(filter_str, src + vcf_field_offsets[5] + 1, filter_size);
+    filter_str[filter_size] = '\0';
 
     /* 7 - INFO */
-    char info_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char info_str[C2B_MAX_FIELD_LENGTH_VALUE];
     ssize_t info_size = vcf_field_offsets[7] - vcf_field_offsets[6] - 1;
     memcpy(info_str, src + vcf_field_offsets[6] + 1, info_size);
+    info_str[info_size] = '\0';
 
-    char format_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
-    char samples_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char format_str[C2B_MAX_FIELD_LENGTH_VALUE];
+    char samples_str[C2B_MAX_FIELD_LENGTH_VALUE];
+
+    format_str[0] = '\0'; /* initialize to zero-length string */
+
     if (vcf_field_idx >= 8) {
         /* 8 - FORMAT */
         ssize_t format_size = vcf_field_offsets[8] - vcf_field_offsets[7] - 1;
         memcpy(format_str, src + vcf_field_offsets[7] + 1, format_size);
+        format_str[format_size] = '\0';
 
         /* 9 - Samples */
         ssize_t samples_size = vcf_field_offsets[vcf_field_idx] - vcf_field_offsets[8] - 1;
         memcpy(samples_str, src + vcf_field_offsets[8] + 1, samples_size);
+        samples_str[samples_size] = '\0';
     }
 
     c2b_vcf_t vcf;
@@ -2083,7 +2187,7 @@ c2b_line_convert_vcf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
     vcf.format = format_str;
     vcf.samples = samples_str;
 
-    char dest_line_str[C2B_MAX_LINE_LENGTH_VALUE] = {0};
+    char dest_line_str[C2B_MAX_LINE_LENGTH_VALUE];
 
     if ((!c2b_globals.vcf_do_not_split_flag) && (memchr(alt_str, c2b_vcf_alt_allele_delim, strlen(alt_str)))) {
 
@@ -2251,7 +2355,7 @@ c2b_sam_cigar_str_to_ops(char *s)
     size_t bases_idx = 0;
     boolean bases_flag = kTrue;
     boolean operation_flag = kFalse;
-    char curr_bases_field[C2B_MAX_OPERATION_FIELD_LENGTH_VALUE] = {0};
+    char curr_bases_field[C2B_MAX_OPERATION_FIELD_LENGTH_VALUE];
     char curr_char = default_cigar_op_operation;
     unsigned int curr_bases = 0;
     ssize_t op_idx = 0;
@@ -2266,6 +2370,7 @@ c2b_sam_cigar_str_to_ops(char *s)
                 bases_flag = kTrue;
             }
             curr_bases_field[bases_idx++] = curr_char;
+            curr_bases_field[bases_idx] = '\0';
         }
         else {
             if (bases_flag) {
@@ -2666,7 +2771,7 @@ c2b_init_pipeset(c2b_pipeset_t *p, const size_t num)
 	c2b_pipe4_cloexec(p->err[n]);
 
         /* set stderr as output for each err write */
-        p->err[n][PIPE_WRITE] = fileno(stderr);
+        p->err[n][PIPE_WRITE] = STDERR_FILENO;
     }
 
     p->num = num;
