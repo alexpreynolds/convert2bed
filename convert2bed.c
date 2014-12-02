@@ -65,6 +65,9 @@ c2b_init_conversion(c2b_pipeset_t *p)
         case SAM_FORMAT:
             c2b_init_sam_conversion(p);
             break;
+        case VCF_FORMAT:
+            c2b_init_vcf_conversion(p);
+            break;
         default:
             fprintf(stderr, "Error: Currently unsupported format\n");
             c2b_print_usage(stderr);
@@ -100,6 +103,12 @@ c2b_init_sam_conversion(c2b_pipeset_t *p)
     c2b_init_generic_conversion(p, (!c2b_globals.split_flag ?
                                     &c2b_line_convert_sam_to_bed_unsorted_without_split_operation :
                                     &c2b_line_convert_sam_to_bed_unsorted_with_split_operation));
+}
+
+static void
+c2b_init_vcf_conversion(c2b_pipeset_t *p)
+{
+    c2b_init_generic_conversion(p, &c2b_line_convert_vcf_to_bed_unsorted);
 }
 
 static void
@@ -1083,7 +1092,7 @@ c2b_line_convert_gff_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
     const char *kv_tok;
     const char *gff_id_prefix = "ID=";
     char *id_str;
-    while((kv_tok = c2b_strsep(&attributes_copy, ";")) != NULL) {
+    while ((kv_tok = c2b_strsep(&attributes_copy, ";")) != NULL) {
         id_str = strstr(kv_tok, gff_id_prefix);
         if (id_str) {
             memcpy(c2b_globals.gff_id, kv_tok + strlen(gff_id_prefix), strlen(kv_tok + strlen(gff_id_prefix)) + 1);
@@ -1953,6 +1962,276 @@ c2b_line_convert_sam_to_bed(c2b_sam_t s, char *dest_line)
 }
 
 static void
+c2b_line_convert_vcf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size)
+{
+    ssize_t vcf_field_offsets[C2B_MAX_FIELD_LENGTH_VALUE] = {-1};
+    int vcf_field_idx = 0;
+    ssize_t current_src_posn = -1;
+
+    while (++current_src_posn < src_size) {
+        if ((src[current_src_posn] == c2b_tab_delim) || (src[current_src_posn] == c2b_line_delim)) {
+            vcf_field_offsets[vcf_field_idx++] = current_src_posn;
+        }
+    }
+    vcf_field_offsets[vcf_field_idx] = src_size;
+
+    /* 
+       If number of fields in not in bounds, we may need to exit early
+    */
+
+    if ((vcf_field_idx + 1) < c2b_vcf_field_min) {
+        /* Legal header cases: line starts with "##" or "#" */
+        if ((vcf_field_idx == 0) && (src[0] == c2b_vcf_header_prefix)) { 
+            if (c2b_globals.keep_header_flag) { 
+                /* copy header line to destination stream buffer */
+                char src_header_line_str[C2B_MAX_LINE_LENGTH_VALUE] = {0};
+                char dest_header_line_str[C2B_MAX_LINE_LENGTH_VALUE] = {0};
+                memcpy(src_header_line_str, src, src_size);
+                sprintf(dest_header_line_str, "%s\t%u\t%u\t%s\n", c2b_header_chr_name, c2b_globals.header_line_idx, (c2b_globals.header_line_idx + 1), src_header_line_str);
+                memcpy(dest + *dest_size, dest_header_line_str, strlen(dest_header_line_str));
+                *dest_size += strlen(dest_header_line_str);
+                c2b_globals.header_line_idx++;
+                return;
+            }
+            else {
+                return;
+            }
+        }
+        else if (vcf_field_idx == 0) {
+            fprintf(stderr, "Error: Invalid field count (%d) -- input file may not match input format\n", vcf_field_idx);
+            c2b_print_usage(stderr);
+            exit(EXIT_FAILURE);            
+        }
+    }
+
+    /* 0 - CHROM */
+    char chrom_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t chrom_size = vcf_field_offsets[0] - 1;
+    memcpy(chrom_str, src, chrom_size);
+
+    /* 1 - POS */
+    char pos_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t pos_size = vcf_field_offsets[1] - vcf_field_offsets[0] - 1;
+    memcpy(pos_str, src + vcf_field_offsets[0] + 1, pos_size);
+    unsigned long long int pos_val = strtoull(pos_str, NULL, 10);
+    unsigned long long int start_val = pos_val - 1;
+    unsigned long long int end_val = pos_val; /* note that this value may change below, depending on options */
+
+    /* 2 - ID */
+    char id_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t id_size = vcf_field_offsets[2] - vcf_field_offsets[1] - 1;
+    memcpy(id_str, src + vcf_field_offsets[1] + 1, id_size);
+
+    /* 3 - REF */
+    char ref_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t ref_size = vcf_field_offsets[3] - vcf_field_offsets[2] - 1;
+    memcpy(ref_str, src + vcf_field_offsets[2] + 1, ref_size);
+
+    /* 4 - ALT */
+    char alt_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t alt_size = vcf_field_offsets[4] - vcf_field_offsets[3] - 1;
+    memcpy(alt_str, src + vcf_field_offsets[3] + 1, alt_size);
+
+    /* 5 - QUAL */
+    char qual_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t qual_size = vcf_field_offsets[5] - vcf_field_offsets[4] - 1;
+    memcpy(qual_str, src + vcf_field_offsets[4] + 1, qual_size);
+
+    /* 6 - FILTER */
+    char filter_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t filter_size = vcf_field_offsets[6] - vcf_field_offsets[5] - 1;
+    memcpy(filter_str, src + vcf_field_offsets[5] + 1, filter_size);
+
+    /* 7 - INFO */
+    char info_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    ssize_t info_size = vcf_field_offsets[7] - vcf_field_offsets[6] - 1;
+    memcpy(info_str, src + vcf_field_offsets[6] + 1, info_size);
+
+    char format_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    char samples_str[C2B_MAX_FIELD_LENGTH_VALUE] = {0};
+    if (vcf_field_idx >= 8) {
+        /* 8 - FORMAT */
+        ssize_t format_size = vcf_field_offsets[8] - vcf_field_offsets[7] - 1;
+        memcpy(format_str, src + vcf_field_offsets[7] + 1, format_size);
+
+        /* 9 - Samples */
+        ssize_t samples_size = vcf_field_offsets[vcf_field_idx] - vcf_field_offsets[8] - 1;
+        memcpy(samples_str, src + vcf_field_offsets[8] + 1, samples_size);
+    }
+
+    c2b_vcf_t vcf;
+    vcf.chrom = chrom_str;
+    vcf.pos = pos_val;
+    vcf.start = start_val;
+    vcf.end = end_val;
+    vcf.id = id_str;
+    vcf.ref = ref_str;
+    vcf.alt = alt_str;
+    vcf.qual = qual_str;
+    vcf.filter = filter_str;
+    vcf.info = info_str;
+    vcf.format = format_str;
+    vcf.samples = samples_str;
+
+    char dest_line_str[C2B_MAX_LINE_LENGTH_VALUE] = {0};
+
+    if ((!c2b_globals.vcf_do_not_split_flag) && (memchr(alt_str, c2b_vcf_alt_allele_delim, strlen(alt_str)))) {
+
+        /* loop through each allele */
+
+        char *alt_alleles_copy = NULL;
+        alt_alleles_copy = malloc(strlen(alt_str) + 1);
+        if (!alt_alleles_copy) {
+            fprintf(stderr, "Error: Could not allocate space for VCF alt alleles copy\n");
+            exit(EXIT_FAILURE);
+        }
+        memcpy(alt_alleles_copy, alt_str, strlen(alt_str) + 1);
+        const char *allele_tok;
+        while ((allele_tok = c2b_strsep(&alt_alleles_copy, ",")) != NULL) {
+            vcf.alt = (char *) allele_tok; /* discard const */
+            if ((c2b_globals.vcf_filter_count == 1) && (!c2b_globals.vcf_insertions_flag)) {
+                vcf.end = start_val + abs(ref_size - strlen(vcf.alt)) + 1;
+            }
+            if ( (c2b_globals.vcf_filter_count == 0) ||
+                 ((c2b_globals.vcf_snvs_flag) && (c2b_vcf_record_is_snv(ref_str, vcf.alt))) ||
+                 ((c2b_globals.vcf_insertions_flag) && (c2b_vcf_record_is_insertion(ref_str, vcf.alt))) ||
+                 ((c2b_globals.vcf_deletions_flag) && (c2b_vcf_record_is_deletion(ref_str, vcf.alt))) ) 
+                {
+                c2b_line_convert_vcf_to_bed(vcf, dest_line_str);
+                memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
+                *dest_size += strlen(dest_line_str);
+            }
+        }
+        free(alt_alleles_copy), alt_alleles_copy = NULL;
+    }
+    else {
+
+        /* just print the one allele */
+
+        vcf.end = start_val + abs(ref_size - strlen(alt_str)) + 1;
+        if ( (c2b_globals.vcf_filter_count == 0) ||
+             ((c2b_globals.vcf_snvs_flag) && (c2b_vcf_record_is_snv(ref_str, alt_str))) ||
+             ((c2b_globals.vcf_insertions_flag) && (c2b_vcf_record_is_insertion(ref_str, alt_str))) ||
+             ((c2b_globals.vcf_deletions_flag) && (c2b_vcf_record_is_deletion(ref_str, alt_str))) ) 
+            {
+            c2b_line_convert_vcf_to_bed(vcf, dest_line_str);
+            memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
+            *dest_size += strlen(dest_line_str);
+        }
+    }
+}
+
+static inline boolean
+c2b_vcf_allele_is_id(char *s)
+{
+    return ((s[0] == c2b_vcf_id_prefix) && (s[strlen(s)-1] == c2b_vcf_id_suffix)) ? kTrue : kFalse;
+}
+
+static inline boolean
+c2b_vcf_record_is_snv(char *ref, char *alt) 
+{
+    return ((!c2b_vcf_allele_is_id(alt)) && ((strlen(ref) - strlen(alt)) == 0)) ? kTrue : kFalse;
+}
+
+static inline boolean
+c2b_vcf_record_is_insertion(char *ref, char *alt) 
+{
+    return ((!c2b_vcf_allele_is_id(alt)) && (((int) strlen(ref) - (int) strlen(alt)) < 0)) ? kTrue : kFalse;
+}
+
+static inline boolean
+c2b_vcf_record_is_deletion(char *ref, char *alt) 
+{
+    return ((!c2b_vcf_allele_is_id(alt)) && ((strlen(ref) - strlen(alt)) > 0)) ? kTrue : kFalse;
+}
+
+static inline void
+c2b_line_convert_vcf_to_bed(c2b_vcf_t v, char *dest_line) 
+{
+    /* 
+       For VCF v4.2-formatted data, we use the mapping provided by BEDOPS convention described at:
+
+       http://bedops.readthedocs.org/en/latest/content/reference/file-management/conversion/vcf2bed.html
+
+       VCF field                 BED column index       BED field
+       -------------------------------------------------------------------------
+       CHROM                     1                      chromosome
+       POS - 1                   2                      start
+       POS (*)                   3                      stop
+       ID                        4                      id
+       QUAL                      5                      score
+
+      * : When using --deletions, the stop value of the BED output is determined by the length difference 
+          between ALT and REF alleles. Use of --insertions or --snvs yields a one-base BED element.
+
+       The remaining VCF columns are mapped as-is, in same order, to adjacent BED columns:
+
+       VCF field                 BED column index       BED field
+       -------------------------------------------------------------------------
+       REF                       6                      -
+       ALT                       7                      -
+       FILTER                    8                      -
+       INFO                      9                      -
+
+       If present in the VCF v4 input, the following columns are also mapped:
+
+       VCF field                 BED column index       BED field
+       -------------------------------------------------------------------------
+       FORMAT                    10                     -
+       Sample 1                  11                     -
+       Sample 2                  12                     -
+       ...
+    */
+
+    if (strlen(v.format) > 0) {
+        sprintf(dest_line,
+                "%s\t"                          \
+                "%" PRIu64 "\t"                 \
+                "%" PRIu64 "\t"                 \
+                "%s\t"                          \
+                "%s\t"                          \
+                "%s\t"                          \
+                "%s\t"                          \
+                "%s\t"                          \
+                "%s\t"                          \
+                "%s\t"                          \
+                "%s\n",
+                v.chrom,
+                v.start,
+                v.end,
+                v.id,
+                v.qual,
+                v.ref,
+                v.alt,
+                v.filter,
+                v.info,
+                v.format,
+                v.samples);
+    }
+    else {
+        sprintf(dest_line,
+                "%s\t"                          \
+                "%" PRIu64 "\t"                 \
+                "%" PRIu64 "\t"                 \
+                "%s\t"                          \
+                "%s\t"                          \
+                "%s\t"                          \
+                "%s\t"                          \
+                "%s\t"                          \
+                "%s\n",
+                v.chrom,
+                v.start,
+                v.end,
+                v.id,
+                v.qual,
+                v.ref,
+                v.alt,
+                v.filter,
+                v.info);
+    }
+}
+
+static void
 c2b_sam_cigar_str_to_ops(char *s)
 {
     size_t s_idx;
@@ -2815,9 +3094,11 @@ c2b_init_globals()
     c2b_globals.keep_header_flag = kFalse;
     c2b_globals.split_flag = kFalse;
     c2b_globals.headered_flag = kTrue;
+    c2b_globals.vcf_do_not_split_flag = kFalse;
     c2b_globals.vcf_snvs_flag = kFalse;
     c2b_globals.vcf_insertions_flag = kFalse;
     c2b_globals.vcf_deletions_flag = kFalse;
+    c2b_globals.vcf_filter_count = 0U;
     c2b_globals.header_line_idx = 0U;
     c2b_globals.starch_bzip2_flag = kFalse;
     c2b_globals.starch_gzip_flag = kFalse;
@@ -2857,9 +3138,11 @@ c2b_delete_globals()
     c2b_globals.keep_header_flag = kFalse;
     c2b_globals.split_flag = kFalse;
     c2b_globals.headered_flag = kTrue;
+    c2b_globals.vcf_do_not_split_flag = kFalse;
     c2b_globals.vcf_snvs_flag = kFalse;
     c2b_globals.vcf_insertions_flag = kFalse;
     c2b_globals.vcf_deletions_flag = kFalse;
+    c2b_globals.vcf_filter_count = 0U;
     c2b_globals.header_line_idx = 0U;
     c2b_globals.starch_bzip2_flag = kFalse;
     c2b_globals.starch_gzip_flag = kFalse;
@@ -2958,6 +3241,21 @@ c2b_init_command_line_options(int argc, char **argv)
             case 's':
                 c2b_globals.split_flag = kTrue;
                 break;
+            case 'p':
+                c2b_globals.vcf_do_not_split_flag = kTrue;
+                break;
+            case 'v':
+                c2b_globals.vcf_filter_count++;
+                c2b_globals.vcf_snvs_flag = kTrue;
+                break;
+            case 't':
+                c2b_globals.vcf_filter_count++;
+                c2b_globals.vcf_insertions_flag = kTrue;
+                break;
+            case 'n':
+                c2b_globals.vcf_filter_count++;
+                c2b_globals.vcf_deletions_flag = kTrue;
+                break;
             case 'd':
                 c2b_globals.sort_flag = kFalse;
                 break;
@@ -3021,6 +3319,12 @@ c2b_init_command_line_options(int argc, char **argv)
             exit(EXIT_FAILURE);
         }
         memset(c2b_globals.gtf_id, 0, C2B_MAX_FIELD_LENGTH_VALUE);
+    }
+
+    if (c2b_globals.vcf_filter_count > 1) {
+        fprintf(stderr, "Error: Cannot specify more than one VCF variant filter option\n");
+        c2b_print_usage(stderr);
+        exit(EXIT_FAILURE);
     }
 
     if ((c2b_globals.starch_bzip2_flag) && (c2b_globals.starch_gzip_flag)) {

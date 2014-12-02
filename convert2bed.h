@@ -42,65 +42,76 @@ const boolean kFalse = 0;
 #define C2B_MAX_OPERATIONS_VALUE 64
 
 extern const char *c2b_samtools;
-const char *c2b_samtools = "samtools";
 extern const char *c2b_sort_bed;
-const char *c2b_sort_bed = "sort-bed";
 extern const char *c2b_starch;
-const char *c2b_starch = "starch";
 extern const char *c2b_cat;
-const char *c2b_cat = "cat";
 extern const char *c2b_default_output_format;
-const char *c2b_default_output_format = "bed";
 extern const char *c2b_unmapped_read_chr_name;
-const char *c2b_unmapped_read_chr_name = "_unmapped";
 extern const char *c2b_header_chr_name;
-const char *c2b_header_chr_name = "_header";
 extern const char *sort_bed_max_mem_arg;
-const char *sort_bed_max_mem_arg = " --max-mem ";
 extern const char *sort_bed_max_mem_default_arg;
-const char *sort_bed_max_mem_default_arg = " --max-mem 2G ";
 extern const char *sort_bed_tmpdir_arg;
-const char *sort_bed_tmpdir_arg = " --tmpdir ";
 extern const char *sort_bed_stdin;
-const char *sort_bed_stdin = " - ";
 extern const char *starch_bzip2_arg;
-const char *starch_bzip2_arg = " --bzip2 ";
 extern const char *starch_gzip_arg;
-const char *starch_gzip_arg = " --gzip ";
 extern const char *starch_note_prefix_arg;
-const char *starch_note_prefix_arg = " --note=\"";
 extern const char *starch_note_suffix_arg;
-const char *starch_note_suffix_arg = "\" ";
 extern const char *starch_stdin_arg;
-const char *starch_stdin_arg = " - ";
 extern const char c2b_tab_delim;
-const char c2b_tab_delim = '\t';
 extern const char c2b_line_delim;
-const char c2b_line_delim = '\t';
 extern const char c2b_sam_header_prefix;
-const char c2b_sam_header_prefix = '@';
 extern const char *c2b_gff_header;
-const char *c2b_gff_header = "##gff-version 3";
 extern const char *c2b_gff_fasta;
-const char *c2b_gff_fasta = "##FASTA";
 extern const int c2b_gff_field_min;
-const int c2b_gff_field_min = 9;
 extern const int c2b_gff_field_max;
-const int c2b_gff_field_max = 9;
 extern const char *c2b_gff_zero_length_insertion_attribute;
-const char *c2b_gff_zero_length_insertion_attribute = ";zero_length_insertion=True";
 extern const int c2b_gtf_field_min;
-const int c2b_gtf_field_min = 9;
 extern const int c2b_gtf_field_max;
-const int c2b_gtf_field_max = 10;
 extern const char c2b_gtf_comment;
-const char c2b_gtf_comment = '#';
 extern const char *c2b_gtf_zero_length_insertion_attribute;
-const char *c2b_gtf_zero_length_insertion_attribute = "; zero_length_insertion=True";
 extern const int c2b_psl_field_min;
-const int c2b_psl_field_min = 21;
 extern const int c2b_psl_field_max;
+extern const int c2b_vcf_field_min;
+extern const char c2b_vcf_header_prefix;
+extern const char c2b_vcf_alt_allele_delim;
+extern const char c2b_vcf_id_prefix;
+extern const char c2b_vcf_id_suffix;
+
+const char *c2b_samtools = "samtools";
+const char *c2b_sort_bed = "sort-bed";
+const char *c2b_starch = "starch";
+const char *c2b_cat = "cat";
+const char *c2b_default_output_format = "bed";
+const char *c2b_unmapped_read_chr_name = "_unmapped";
+const char *c2b_header_chr_name = "_header";
+const char *sort_bed_max_mem_arg = " --max-mem ";
+const char *sort_bed_max_mem_default_arg = " --max-mem 2G ";
+const char *sort_bed_tmpdir_arg = " --tmpdir ";
+const char *sort_bed_stdin = " - ";
+const char *starch_bzip2_arg = " --bzip2 ";
+const char *starch_gzip_arg = " --gzip ";
+const char *starch_note_prefix_arg = " --note=\"";
+const char *starch_note_suffix_arg = "\" ";
+const char *starch_stdin_arg = " - ";
+const char c2b_tab_delim = '\t';
+const char c2b_line_delim = '\t';
+const char c2b_sam_header_prefix = '@';
+const char *c2b_gff_header = "##gff-version 3";
+const char *c2b_gff_fasta = "##FASTA";
+const int c2b_gff_field_min = 9;
+const int c2b_gff_field_max = 9;
+const char *c2b_gff_zero_length_insertion_attribute = ";zero_length_insertion=True";
+const int c2b_gtf_field_min = 9;
+const int c2b_gtf_field_max = 10;
+const char c2b_gtf_comment = '#';
+const char *c2b_gtf_zero_length_insertion_attribute = "; zero_length_insertion=True";
+const int c2b_psl_field_min = 21;
 const int c2b_psl_field_max = 21;
+const int c2b_vcf_field_min = 8;
+const char c2b_vcf_header_prefix = '#';
+const char c2b_vcf_alt_allele_delim = ',';
+const char c2b_vcf_id_prefix = '<';
+const char c2b_vcf_id_suffix = '>';
 
 /* 
    Allowed input and output formats
@@ -307,6 +318,51 @@ typedef struct psl {
 } c2b_psl_t;
 
 /* 
+   The VCF v4.2 format is described at:
+
+   http://samtools.github.io/hts-specs/VCFv4.2.pdf
+
+   VCF fields are in the following ordering:
+
+   Index   VCF field
+   ---------------------------------------------------------
+   0       CHROM
+   1       POS
+   2       ID
+   3       REF
+   4       ALT
+   5       QUAL
+   6       FILTER
+   7       INFO
+
+   If genotype data is present in the file, these are followed 
+   by a FORMAT column header, then an arbitrary number of sample 
+   IDs. The header line is tab-delimited.
+
+   Index   VCF field
+   ---------------------------------------------------------
+   8       FORMAT
+   9       Sample 1
+   10      Sample 2
+   11+      ...
+*/
+
+typedef struct vcf {
+    char *chrom;
+    unsigned long long int pos;
+    unsigned long long int start;
+    unsigned long long int end;
+    char *id;
+    char *ref;
+    char *alt;
+    char *qual;
+    char *filter;
+    char *info;
+    char *format;
+    char *samples;
+} c2b_vcf_t;
+
+/* 
    At most, we need 4 pipes to handle the most complex conversion
    pipeline within the BEDOPS suite: 
    
@@ -410,6 +466,9 @@ static const char *usage = "\n" \
     "      Split record into multiple BED elements, based on tStarts field value\n\n" \
     "  VCF\n" \
     "  -----------------------------------------------------------------------\n" \
+    "  --do-not-split | -p\n" \
+    "      By default, this application prints multiple BED elements for each alternate\n" \
+    "      allele. Use this flag to print one BED element for all alternate alleles\n" \
     "  --snvs | -v\n" \
     "      Report only single nucleotide variants\n" \
     "  --insertions | -t\n" \
@@ -462,9 +521,11 @@ static struct globals {
     boolean keep_header_flag;
     boolean split_flag;
     boolean headered_flag;
+    boolean vcf_do_not_split_flag;
     boolean vcf_snvs_flag;
     boolean vcf_insertions_flag;
     boolean vcf_deletions_flag;
+    unsigned int vcf_filter_count;
     boolean starch_bzip2_flag;
     boolean starch_gzip_flag;
     char *starch_note;
@@ -484,6 +545,7 @@ static struct option c2b_client_long_options[] = {
     { "all-reads",      no_argument,         NULL,    'a' },
     { "keep-header",    no_argument,         NULL,    'k' },
     { "split",          no_argument,         NULL,    's' },
+    { "do-not-split",   no_argument,         NULL,    'p' },
     { "snvs",           no_argument,         NULL,    'v' },
     { "insertions",     no_argument,         NULL,    't' },
     { "deletions",      no_argument,         NULL,    'n' },
@@ -497,7 +559,7 @@ static struct option c2b_client_long_options[] = {
     { NULL,             no_argument,         NULL,     0  }
 };
 
-static const char *c2b_client_opt_string = "i:o:daksvtnzge:m:r:b:h?";
+static const char *c2b_client_opt_string = "i:o:dakspvtnzge:m:r:b:h?";
 
 #ifdef __cplusplus
 extern "C" {
@@ -508,6 +570,7 @@ extern "C" {
     static void              c2b_init_gtf_conversion(c2b_pipeset_t *p);
     static void              c2b_init_psl_conversion(c2b_pipeset_t *p);
     static void              c2b_init_sam_conversion(c2b_pipeset_t *p);
+    static void              c2b_init_vcf_conversion(c2b_pipeset_t *p);
     static void              c2b_init_generic_conversion(c2b_pipeset_t *p, void(*to_bed_line_functor)(char *, ssize_t *, char *, ssize_t));
     static void              c2b_init_bam_conversion(c2b_pipeset_t *p);
     static inline void       c2b_cmd_cat_stdin(char *cmd);
@@ -523,6 +586,12 @@ extern "C" {
     static void              c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
     static void              c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *dest_size, char *src, ssize_t src_size); 
     static inline void       c2b_line_convert_sam_to_bed(c2b_sam_t s, char *dest_line);
+    static void              c2b_line_convert_vcf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
+    static inline boolean    c2b_vcf_allele_is_id(char *s);
+    static inline boolean    c2b_vcf_record_is_snv(char *ref, char *alt);
+    static inline boolean    c2b_vcf_record_is_insertion(char *ref, char *alt);
+    static inline boolean    c2b_vcf_record_is_deletion(char *ref, char *alt);
+    static inline void       c2b_line_convert_vcf_to_bed(c2b_vcf_t v, char *dest_line);
     static void              c2b_sam_cigar_str_to_ops(char *s);
     static void              c2b_sam_init_cigar_ops(c2b_cigar_t **c, const ssize_t size);
     static void              c2b_sam_debug_cigar_ops(c2b_cigar_t *c);
