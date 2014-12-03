@@ -126,6 +126,7 @@ c2b_init_generic_conversion(c2b_pipeset_t *p, void(*to_bed_line_functor)(char *,
     pthread_t bed_sorted2starch_thread;
     pthread_t starch2stdout_thread;
 #pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
     pid_t cat2generic_proc;
     pid_t bed_unsorted2bed_sorted_proc;
@@ -367,6 +368,7 @@ c2b_init_bam_conversion(c2b_pipeset_t *p)
     pthread_t bed_sorted2starch_thread;
     pthread_t starch2stdout_thread;
 #pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
     pid_t bam2sam_proc;
     pid_t bed_unsorted2bed_sorted_proc;
