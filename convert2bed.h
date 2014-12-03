@@ -1,6 +1,8 @@
 #ifndef C2B_H
 #define C2B_H
 
+#define __STDC_FORMAT_MACROS
+
 #ifdef __cplusplus
 #include <cstdio>
 #include <cstdlib>
