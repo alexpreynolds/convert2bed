@@ -43,6 +43,7 @@ const boolean kFalse = 0;
 #define C2B_MAX_LINE_LENGTH_VALUE 65536
 #define C2B_MAX_LINES_VALUE 32
 #define C2B_MAX_OPERATIONS_VALUE 32
+#define C2B_MAX_CHROMOSOME_LENGTH 20
 
 extern const char *c2b_samtools;
 extern const char *c2b_sort_bed;
@@ -79,6 +80,12 @@ extern const char c2b_vcf_header_prefix;
 extern const char c2b_vcf_alt_allele_delim;
 extern const char c2b_vcf_id_prefix;
 extern const char c2b_vcf_id_suffix;
+extern const char c2b_wig_header_prefix;
+extern const char *c2b_wig_track_prefix;
+extern const char *c2b_wig_browser_prefix;
+extern const char *c2b_wig_variable_step_prefix;
+extern const char *c2b_wig_fixed_step_prefix;
+extern const char *c2b_wig_chr_prefix;
 
 const char *c2b_samtools = "samtools";
 const char *c2b_sort_bed = "sort-bed";
@@ -115,6 +122,12 @@ const char c2b_vcf_header_prefix = '#';
 const char c2b_vcf_alt_allele_delim = ',';
 const char c2b_vcf_id_prefix = '<';
 const char c2b_vcf_id_suffix = '>';
+const char c2b_wig_header_prefix = '#';
+const char *c2b_wig_track_prefix = "track";
+const char *c2b_wig_browser_prefix = "browser";
+const char *c2b_wig_variable_step_prefix = "variableStep";
+const char *c2b_wig_fixed_step_prefix = "fixedStep";
+const char *c2b_wig_chr_prefix = "chr";
 
 /* 
    Allowed input and output formats
@@ -483,9 +496,8 @@ static const char *usage = "\n" \
     "  WIG\n" \
     "  -----------------------------------------------------------------------\n" \
     "  --multisplit=[basename] | -b [basename]\n" \
-    "      A single input file may have multiple WIG sections; a user may pass in\n" \
-    "      more than one file, or both may occur. With this option, every separate\n" \
-    "      input goes to a separate output, starting with [basename].1, then\n" \
+    "      A single input file may have multiple WIG sections. With this option\n" \
+    "      every section gets an ID prefix starting with [basename].1, then\n" \
     "      [basename].2, and so on\n\n" \
     "  Other processing options:\n\n" \
     "  --output=[bed|starch] | -o [bed|starch]\n" \
@@ -509,6 +521,21 @@ static const char *usage = "\n" \
     "      Used with --output=starch, this adds a note to the Starch archive metadata\n" \
     "  --help | -h\n" \
     "      Show help message\n";
+
+typedef struct wig_state {
+    uint32_t section;
+    uint32_t line;
+    uint32_t pos_lines;
+    uint64_t span;
+    uint64_t step;
+    uint64_t start_pos;
+    uint64_t end_pos;
+    double score;
+    char *chr;
+    char *id;
+    boolean is_fixed_step;
+    boolean start_write;
+} c2b_wig_state_t;
 
 static struct globals {
     char *input_format;
@@ -534,11 +561,12 @@ static struct globals {
     char *starch_note;
     char *max_mem_value;
     char *sort_tmpdir_path;
-    char *wig_basename;
     unsigned int header_line_idx;
     c2b_cigar_t *cigar;
     char *gff_id;
     char *gtf_id;
+    char *wig_basename;
+    c2b_wig_state_t *wig_state;
 } c2b_globals;
 
 static struct option c2b_client_long_options[] = {
@@ -574,6 +602,7 @@ extern "C" {
     static void              c2b_init_psl_conversion(c2b_pipeset_t *p);
     static void              c2b_init_sam_conversion(c2b_pipeset_t *p);
     static void              c2b_init_vcf_conversion(c2b_pipeset_t *p);
+    static void              c2b_init_wig_conversion(c2b_pipeset_t *p);
     static void              c2b_init_generic_conversion(c2b_pipeset_t *p, void(*to_bed_line_functor)(char *, ssize_t *, char *, ssize_t));
     static void              c2b_init_bam_conversion(c2b_pipeset_t *p);
     static inline void       c2b_cmd_cat_stdin(char *cmd);
@@ -588,6 +617,10 @@ extern "C" {
     static inline void       c2b_line_convert_psl_to_bed(c2b_psl_t p, char *dest_line);
     static void              c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
     static void              c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *dest_size, char *src, ssize_t src_size); 
+    static void              c2b_sam_cigar_str_to_ops(char *s);
+    static void              c2b_sam_init_cigar_ops(c2b_cigar_t **c, const ssize_t size);
+    static void              c2b_sam_debug_cigar_ops(c2b_cigar_t *c);
+    static void              c2b_sam_delete_cigar_ops(c2b_cigar_t *c);
     static inline void       c2b_line_convert_sam_to_bed(c2b_sam_t s, char *dest_line);
     static void              c2b_line_convert_vcf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
     static inline boolean    c2b_vcf_allele_is_id(char *s);
@@ -595,10 +628,7 @@ extern "C" {
     static inline boolean    c2b_vcf_record_is_insertion(char *ref, char *alt);
     static inline boolean    c2b_vcf_record_is_deletion(char *ref, char *alt);
     static inline void       c2b_line_convert_vcf_to_bed(c2b_vcf_t v, char *dest_line);
-    static void              c2b_sam_cigar_str_to_ops(char *s);
-    static void              c2b_sam_init_cigar_ops(c2b_cigar_t **c, const ssize_t size);
-    static void              c2b_sam_debug_cigar_ops(c2b_cigar_t *c);
-    static void              c2b_sam_delete_cigar_ops(c2b_cigar_t *c);
+    static void              c2b_line_convert_wig_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
     static void *            c2b_read_bytes_from_stdin(void *arg);
     static void *            c2b_process_intermediate_bytes_by_lines(void *arg);
     static void *            c2b_write_in_bytes_to_in_process(void *arg);
@@ -619,6 +649,8 @@ extern "C" {
     static boolean           c2b_is_there(char *candidate);
     static void              c2b_init_globals();
     static void              c2b_delete_globals();
+    static void              c2b_init_global_wig_state();
+    static void              c2b_delete_global_wig_state();
     static void              c2b_init_command_line_options(int argc, char **argv);
     static void              c2b_print_usage(FILE *stream);
     static char *            c2b_to_lowercase(const char *src);
