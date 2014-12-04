@@ -522,6 +522,31 @@ static const char *usage = "\n" \
     "  --help | -h\n" \
     "      Show help message\n";
 
+typedef struct gff_state {
+    char *id;
+} c2b_gff_state_t;
+
+typedef struct gtf_state {
+    char *id;
+} c2b_gtf_state_t;
+
+typedef struct psl_state {
+    boolean headered_flag;
+} c2b_psl_state_t;
+
+typedef struct sam_state {
+    char *samtools_path;
+    c2b_cigar_t *cigar;
+} c2b_sam_state_t;
+
+typedef struct vcf_state {
+    boolean do_not_split_flag;
+    boolean snvs_flag;
+    boolean insertions_flag;
+    boolean deletions_flag;
+    unsigned int filter_count;
+} c2b_vcf_state_t;
+
 typedef struct wig_state {
     uint32_t section;
     uint32_t line;
@@ -535,38 +560,41 @@ typedef struct wig_state {
     char *id;
     boolean is_fixed_step;
     boolean start_write;
+    char *basename;
 } c2b_wig_state_t;
+
+typedef struct sort_params {
+    boolean sort_flag;
+    char *sort_bed_path;
+    char *max_mem_value;
+    char *sort_tmpdir_path;
+} c2b_sort_params_t;
+
+typedef struct starch_params {
+    char *path;
+    boolean bzip2_flag;
+    boolean gzip_flag;
+    char *note;
+} c2b_starch_params_t;
 
 static struct globals {
     char *input_format;
     c2b_format_t input_format_idx;
     char *output_format;
     c2b_format_t output_format_idx;
-    char *samtools_path;
-    char *sort_bed_path;
-    char *starch_path;
     char *cat_path;
-    boolean sort_flag;
+    unsigned int header_line_idx;
     boolean all_reads_flag;
     boolean keep_header_flag;
     boolean split_flag;
-    boolean headered_flag;
-    boolean vcf_do_not_split_flag;
-    boolean vcf_snvs_flag;
-    boolean vcf_insertions_flag;
-    boolean vcf_deletions_flag;
-    unsigned int vcf_filter_count;
-    boolean starch_bzip2_flag;
-    boolean starch_gzip_flag;
-    char *starch_note;
-    char *max_mem_value;
-    char *sort_tmpdir_path;
-    unsigned int header_line_idx;
-    c2b_cigar_t *cigar;
-    char *gff_id;
-    char *gtf_id;
-    char *wig_basename;
+    c2b_gff_state_t *gff_state;
+    c2b_gtf_state_t *gtf_state;
+    c2b_psl_state_t *psl_state;
+    c2b_sam_state_t *sam_state;
+    c2b_vcf_state_t *vcf_state;
     c2b_wig_state_t *wig_state;
+    c2b_sort_params_t *sort_params;
+    c2b_starch_params_t *starch_params;
 } c2b_globals;
 
 static struct option c2b_client_long_options[] = {
@@ -649,8 +677,22 @@ extern "C" {
     static boolean           c2b_is_there(char *candidate);
     static void              c2b_init_globals();
     static void              c2b_delete_globals();
+    static void              c2b_init_global_gff_state();
+    static void              c2b_delete_global_gff_state();
+    static void              c2b_init_global_gtf_state();
+    static void              c2b_delete_global_gtf_state();
+    static void              c2b_init_global_psl_state();
+    static void              c2b_delete_global_psl_state();
+    static void              c2b_init_global_sam_state();
+    static void              c2b_delete_global_sam_state();
+    static void              c2b_init_global_vcf_state();
+    static void              c2b_delete_global_vcf_state();
     static void              c2b_init_global_wig_state();
     static void              c2b_delete_global_wig_state();
+    static void              c2b_init_global_sort_params();
+    static void              c2b_delete_global_sort_params();
+    static void              c2b_init_global_starch_params();
+    static void              c2b_delete_global_starch_params();
     static void              c2b_init_command_line_options(int argc, char **argv);
     static void              c2b_print_usage(FILE *stream);
     static char *            c2b_to_lowercase(const char *src);
