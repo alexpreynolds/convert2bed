@@ -2456,6 +2456,9 @@ c2b_line_convert_vcf_to_bed(c2b_vcf_t v, char *dest_line)
 static void
 c2b_line_convert_wig_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size)
 {
+    char src_line_str[C2B_MAX_LINE_LENGTH_VALUE];
+    char dest_line_str[C2B_MAX_LINE_LENGTH_VALUE];
+
     /* 
        Initialize and increment parameters
     */
