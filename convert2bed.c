@@ -2030,7 +2030,7 @@ c2b_sam_init_cigar_ops(c2b_cigar_t **c, const ssize_t size)
 
 /* 
    specifying special attribute for c2b_sam_debug_cigar_ops() to avoid: "warning: unused 
-   function 'c2b_sam_debug_cigar_ops' [-Wunused-function]" message during compilation
+   function 'c2b_sam_debug_cigar_ops' [-Wunused-function]" message during non-debug compilation
 
    cf. http://gcc.gnu.org/onlinedocs/gcc-3.4.1/gcc/Function-Attributes.html#Function%20Attributes
 */
@@ -3118,7 +3118,7 @@ c2b_init_pipeset(c2b_pipeset_t *p, const size_t num)
 
 /* 
    specifying special attribute for c2b_debug_pipeset() to avoid: "warning: unused 
-   function 'c2b_debug_pipeset' [-Wunused-function]" message during compilation
+   function 'c2b_debug_pipeset' [-Wunused-function]" message during non-debug compilation
 
    cf. http://gcc.gnu.org/onlinedocs/gcc-3.4.1/gcc/Function-Attributes.html#Function%20Attributes
 */
@@ -3197,9 +3197,9 @@ c2b_popen4(const char* cmd, int pin[2], int pout[2], int perr[2], int flags)
         return ret;
     } 
     else if (ret == 0) {
-        /**
-         * Child-side of fork
-         */
+        /* 
+           Child-side of fork
+        */
         if (flags & POPEN4_FLAG_CLOSE_CHILD_STDIN) {
             close(STDIN_FILENO);
         }
@@ -3226,9 +3226,9 @@ c2b_popen4(const char* cmd, int pin[2], int pout[2], int perr[2], int flags)
         exit(EXIT_FAILURE);
     }
     else {
-        /**
-         * Parent-side of fork
-         */
+        /* 
+           Parent-side of fork
+        */
         if (~flags & POPEN4_FLAG_NOCLOSE_PARENT_STDIN && ~flags & POPEN4_FLAG_CLOSE_CHILD_STDIN) {
             close(pin[PIPE_READ]);
         }
