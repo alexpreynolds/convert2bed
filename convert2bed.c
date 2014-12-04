@@ -2456,21 +2456,6 @@ c2b_line_convert_vcf_to_bed(c2b_vcf_t v, char *dest_line)
 static void
 c2b_line_convert_wig_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size)
 {
-    ssize_t wig_field_offsets[C2B_MAX_FIELD_LENGTH_VALUE];
-    int wig_field_idx = 0;
-    ssize_t current_src_posn = -1;
-
-    while (++current_src_posn < src_size) {
-        if ((src[current_src_posn] == c2b_tab_delim) || (src[current_src_posn] == c2b_line_delim)) {
-            wig_field_offsets[wig_field_idx++] = current_src_posn;
-        }
-    }
-    wig_field_offsets[wig_field_idx] = src_size;
-    wig_field_offsets[wig_field_idx + 1] = -1;
-
-    char src_line_str[C2B_MAX_LINE_LENGTH_VALUE];
-    char dest_line_str[C2B_MAX_LINE_LENGTH_VALUE];
-
     /* 
        Initialize and increment parameters
     */
