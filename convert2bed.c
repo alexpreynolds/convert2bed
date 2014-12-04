@@ -153,7 +153,7 @@ c2b_init_generic_conversion(c2b_pipeset_t *p, void(*to_bed_line_functor)(char *,
     char bed_sorted2starch_cmd[C2B_MAX_LINE_LENGTH_VALUE];
     void (*generic2bed_unsorted_line_functor)(char *, ssize_t *, char *, ssize_t) = to_bed_line_functor;
 
-    if ((!c2b_globals.sort_params->sort_flag) && (c2b_globals.output_format_idx == BED_FORMAT)) {
+    if ((!c2b_globals.sort->is_enabled) && (c2b_globals.output_format_idx == BED_FORMAT)) {
         cat2generic_stage.pipeset = p;
         cat2generic_stage.line_functor = NULL;
         cat2generic_stage.src = -1; /* src is really stdin */
@@ -242,7 +242,7 @@ c2b_init_generic_conversion(c2b_pipeset_t *p, void(*to_bed_line_functor)(char *,
 
 #pragma GCC diagnostic pop
 
-    if (c2b_globals.sort_params->sort_flag) {
+    if (c2b_globals.sort->is_enabled) {
         c2b_cmd_sort_bed(bed_unsorted2bed_sorted_cmd);
 #ifdef DEBUG
         fprintf(stderr, "Debug: c2b_cmd_sort_bed: [%s]\n", bed_unsorted2bed_sorted_cmd);
@@ -283,7 +283,7 @@ c2b_init_generic_conversion(c2b_pipeset_t *p, void(*to_bed_line_functor)(char *,
        threads for their ordered execution.
     */
 
-    if ((!c2b_globals.sort_params->sort_flag) && (c2b_globals.output_format_idx == BED_FORMAT)) {
+    if ((!c2b_globals.sort->is_enabled) && (c2b_globals.output_format_idx == BED_FORMAT)) {
         pthread_create(&cat2generic_thread,
                        NULL,
                        c2b_read_bytes_from_stdin,
@@ -338,7 +338,7 @@ c2b_init_generic_conversion(c2b_pipeset_t *p, void(*to_bed_line_functor)(char *,
                        &starch2stdout_stage);
     }
 
-    if ((!c2b_globals.sort_params->sort_flag) && (c2b_globals.output_format_idx == BED_FORMAT)) {
+    if ((!c2b_globals.sort->is_enabled) && (c2b_globals.output_format_idx == BED_FORMAT)) {
         pthread_join(cat2generic_thread, (void **) NULL);
         pthread_join(generic2bed_unsorted_thread, (void **) NULL);
         pthread_join(bed_unsorted2stdout_thread, (void **) NULL);
@@ -399,7 +399,7 @@ c2b_init_bam_conversion(c2b_pipeset_t *p)
                                      &c2b_line_convert_sam_to_bed_unsorted_without_split_operation :
                                      &c2b_line_convert_sam_to_bed_unsorted_with_split_operation);
 
-    if ((!c2b_globals.sort_params->sort_flag) && (c2b_globals.output_format_idx == BED_FORMAT)) {
+    if ((!c2b_globals.sort->is_enabled) && (c2b_globals.output_format_idx == BED_FORMAT)) {
         bam2sam_stage.pipeset = p;
         bam2sam_stage.line_functor = NULL;
         bam2sam_stage.src = -1; /* src is really stdin */
@@ -487,7 +487,7 @@ c2b_init_bam_conversion(c2b_pipeset_t *p)
 
 #pragma GCC diagnostic pop
 
-    if (c2b_globals.sort_params->sort_flag) {
+    if (c2b_globals.sort->is_enabled) {
         c2b_cmd_sort_bed(bed_unsorted2bed_sorted_cmd);
 #ifdef DEBUG
         fprintf(stderr, "Debug: c2b_cmd_sort_bed: [%s]\n", bed_unsorted2bed_sorted_cmd);
@@ -528,7 +528,7 @@ c2b_init_bam_conversion(c2b_pipeset_t *p)
        threads for their ordered execution.
     */
 
-    if ((!c2b_globals.sort_params->sort_flag) && (c2b_globals.output_format_idx == BED_FORMAT)) {
+    if ((!c2b_globals.sort->is_enabled) && (c2b_globals.output_format_idx == BED_FORMAT)) {
         pthread_create(&bam2sam_thread,
                        NULL,
                        c2b_read_bytes_from_stdin,
@@ -583,7 +583,7 @@ c2b_init_bam_conversion(c2b_pipeset_t *p)
                        &starch2stdout_stage);
     }
 
-    if ((!c2b_globals.sort_params->sort_flag) && (c2b_globals.output_format_idx == BED_FORMAT)) {
+    if ((!c2b_globals.sort->is_enabled) && (c2b_globals.output_format_idx == BED_FORMAT)) {
         pthread_join(bam2sam_thread, (void **) NULL);
         pthread_join(sam2bed_unsorted_thread, (void **) NULL);
         pthread_join(bed_unsorted2stdout_thread, (void **) NULL);
@@ -614,12 +614,12 @@ c2b_cmd_cat_stdin(char *cmd)
     
     /* /path/to/cat - */
     memcpy(cmd,
-           c2b_globals.cat_params->path,
-           strlen(c2b_globals.cat_params->path));
-    memcpy(cmd + strlen(c2b_globals.cat_params->path),
+           c2b_globals.cat->path,
+           strlen(c2b_globals.cat->path));
+    memcpy(cmd + strlen(c2b_globals.cat->path),
            cat_args,
            strlen(cat_args));
-    cmd[strlen(c2b_globals.cat_params->path) + strlen(cat_args)] = '\0';
+    cmd[strlen(c2b_globals.cat->path) + strlen(cat_args)] = '\0';
 }
 
 static inline void
@@ -629,12 +629,12 @@ c2b_cmd_bam_to_sam(char *cmd)
 
     /* /path/to/samtools view -h - */
     memcpy(cmd, 
-           c2b_globals.sam_state->samtools_path, 
-           strlen(c2b_globals.sam_state->samtools_path));
-    memcpy(cmd + strlen(c2b_globals.sam_state->samtools_path), 
+           c2b_globals.sam->samtools_path, 
+           strlen(c2b_globals.sam->samtools_path));
+    memcpy(cmd + strlen(c2b_globals.sam->samtools_path), 
            bam2sam_args, 
            strlen(bam2sam_args));
-    cmd[strlen(c2b_globals.sam_state->samtools_path) + strlen(bam2sam_args)] = '\0';
+    cmd[strlen(c2b_globals.sam->samtools_path) + strlen(bam2sam_args)] = '\0';
 }
 
 static inline void
@@ -643,13 +643,13 @@ c2b_cmd_sort_bed(char *cmd)
     char sort_bed_args[C2B_MAX_LINE_LENGTH_VALUE];
 
     /* /path/to/sort-bed [--max-mem <val>] [--tmpdir <path>] - */
-    if (c2b_globals.sort_params->max_mem_value) {
+    if (c2b_globals.sort->max_mem_value) {
         memcpy(sort_bed_args,
                sort_bed_max_mem_arg, 
                strlen(sort_bed_max_mem_arg));
         memcpy(sort_bed_args + strlen(sort_bed_args), 
-               c2b_globals.sort_params->max_mem_value, 
-               strlen(c2b_globals.sort_params->max_mem_value));
+               c2b_globals.sort->max_mem_value, 
+               strlen(c2b_globals.sort->max_mem_value));
         sort_bed_args[strlen(sort_bed_max_mem_arg) + strlen(sort_bed_args)] = '\0';
     }
     else {
@@ -658,14 +658,14 @@ c2b_cmd_sort_bed(char *cmd)
                strlen(sort_bed_max_mem_default_arg));
         sort_bed_args[strlen(sort_bed_max_mem_default_arg)] = '\0';
     }
-    if (c2b_globals.sort_params->sort_tmpdir_path) {
+    if (c2b_globals.sort->sort_tmpdir_path) {
         memcpy(sort_bed_args + strlen(sort_bed_args),
                sort_bed_tmpdir_arg,
                strlen(sort_bed_tmpdir_arg));
         memcpy(sort_bed_args + strlen(sort_bed_args),
-               c2b_globals.sort_params->sort_tmpdir_path,
-               strlen(c2b_globals.sort_params->sort_tmpdir_path));
-        sort_bed_args[strlen(sort_bed_args) + strlen(c2b_globals.sort_params->sort_tmpdir_path)] = '\0';
+               c2b_globals.sort->sort_tmpdir_path,
+               strlen(c2b_globals.sort->sort_tmpdir_path));
+        sort_bed_args[strlen(sort_bed_args) + strlen(c2b_globals.sort->sort_tmpdir_path)] = '\0';
     }
     memcpy(sort_bed_args + strlen(sort_bed_args),
            sort_bed_stdin,
@@ -674,12 +674,12 @@ c2b_cmd_sort_bed(char *cmd)
 
     /* cmd */
     memcpy(cmd, 
-           c2b_globals.sort_params->sort_bed_path, 
-           strlen(c2b_globals.sort_params->sort_bed_path));
-    memcpy(cmd + strlen(c2b_globals.sort_params->sort_bed_path), 
+           c2b_globals.sort->sort_bed_path, 
+           strlen(c2b_globals.sort->sort_bed_path));
+    memcpy(cmd + strlen(c2b_globals.sort->sort_bed_path), 
            sort_bed_args, 
            strlen(sort_bed_args));
-    cmd[strlen(c2b_globals.sort_params->sort_bed_path) + strlen(sort_bed_args)] = '\0';
+    cmd[strlen(c2b_globals.sort->sort_bed_path) + strlen(sort_bed_args)] = '\0';
 }
 
 static inline void
@@ -688,13 +688,13 @@ c2b_cmd_starch_bed(char *cmd)
     char starch_args[C2B_MAX_LINE_LENGTH_VALUE];
 
     /* /path/to/starch [--bzip2 | --gzip] [--note="xyz..."] - */
-    if (c2b_globals.starch_params->bzip2_flag) {
+    if (c2b_globals.starch->bzip2) {
         memcpy(starch_args,
                starch_bzip2_arg,
                strlen(starch_bzip2_arg));
         starch_args[strlen(starch_bzip2_arg)] = '\0';
     }
-    else if (c2b_globals.starch_params->gzip_flag) {
+    else if (c2b_globals.starch->gzip) {
         memcpy(starch_args + strlen(starch_args),
                starch_gzip_arg,
                strlen(starch_gzip_arg));
@@ -702,23 +702,23 @@ c2b_cmd_starch_bed(char *cmd)
     }
 
 #ifdef DEBUG
-    fprintf(stderr, "Debug: c2b_globals.starch_params->bzip2_flag: [%d]\n", c2b_globals.starch_params->bzip2_flag);
-    fprintf(stderr, "Debug: c2b_globals.starch_params->gzip_flag: [%d]\n", c2b_globals.starch_params->gzip_flag);
-    fprintf(stderr, "Debug: c2b_globals.starch_params->note: [%s]\n", c2b_globals.starch_params->note);
+    fprintf(stderr, "Debug: c2b_globals.starch->bzip2: [%d]\n", c2b_globals.starch->bzip2);
+    fprintf(stderr, "Debug: c2b_globals.starch->gzip: [%d]\n", c2b_globals.starch->gzip);
+    fprintf(stderr, "Debug: c2b_globals.starch->note: [%s]\n", c2b_globals.starch->note);
     fprintf(stderr, "Debug: starch_args: [%s]\n", starch_args);
 #endif
 
-    if (c2b_globals.starch_params->note) {
+    if (c2b_globals.starch->note) {
         memcpy(starch_args + strlen(starch_args),
                starch_note_prefix_arg,
                strlen(starch_note_prefix_arg));
         memcpy(starch_args + strlen(starch_args),
-               c2b_globals.starch_params->note,
-               strlen(c2b_globals.starch_params->note));
+               c2b_globals.starch->note,
+               strlen(c2b_globals.starch->note));
         memcpy(starch_args + strlen(starch_args),
                starch_note_suffix_arg,
                strlen(starch_note_suffix_arg));
-        starch_args[strlen(starch_args) + strlen(starch_note_prefix_arg) + strlen(c2b_globals.starch_params->note) + strlen(starch_note_suffix_arg)] = '\0';
+        starch_args[strlen(starch_args) + strlen(starch_note_prefix_arg) + strlen(c2b_globals.starch->note) + strlen(starch_note_suffix_arg)] = '\0';
     }
     memcpy(starch_args + strlen(starch_args),
            starch_stdin_arg,
@@ -730,12 +730,12 @@ c2b_cmd_starch_bed(char *cmd)
 
     /* cmd */
     memcpy(cmd, 
-           c2b_globals.starch_params->path, 
-           strlen(c2b_globals.starch_params->path));
-    memcpy(cmd + strlen(c2b_globals.starch_params->path), 
+           c2b_globals.starch->path, 
+           strlen(c2b_globals.starch->path));
+    memcpy(cmd + strlen(c2b_globals.starch->path), 
            starch_args, 
            strlen(starch_args));
-    cmd[strlen(c2b_globals.starch_params->path) + strlen(starch_args)] = '\0';
+    cmd[strlen(c2b_globals.starch->path) + strlen(starch_args)] = '\0';
 }
 
 static void
@@ -896,11 +896,11 @@ c2b_line_convert_gtf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
         id_str = strstr(kv_tok, gtf_id_prefix);
         if (id_str) {
             /* we remove quotation marks around ID string value */
-            memcpy(c2b_globals.gtf_state->id, kv_tok + strlen(gtf_id_prefix) + 1, strlen(kv_tok + strlen(gtf_id_prefix)) - 2);
+            memcpy(c2b_globals.gtf->id, kv_tok + strlen(gtf_id_prefix) + 1, strlen(kv_tok + strlen(gtf_id_prefix)) - 2);
         }
     }
     free(attributes_copy), attributes_copy = NULL;
-    gtf.id = c2b_globals.gtf_state->id;
+    gtf.id = c2b_globals.gtf->id;
 
     /* 
        Convert GTF struct to BED string and copy it to destination
@@ -1148,11 +1148,11 @@ c2b_line_convert_gff_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
     while ((kv_tok = c2b_strsep(&attributes_copy, ";")) != NULL) {
         id_str = strstr(kv_tok, gff_id_prefix);
         if (id_str) {
-            memcpy(c2b_globals.gff_state->id, kv_tok + strlen(gff_id_prefix), strlen(kv_tok + strlen(gff_id_prefix)) + 1);
+            memcpy(c2b_globals.gff->id, kv_tok + strlen(gff_id_prefix), strlen(kv_tok + strlen(gff_id_prefix)) + 1);
         }
     }
     free(attributes_copy), attributes_copy = NULL;
-    gff.id = c2b_globals.gff_state->id;
+    gff.id = c2b_globals.gff->id;
 
     /* 
        Convert GFF struct to BED string and copy it to destination
@@ -1235,7 +1235,7 @@ c2b_line_convert_psl_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
 
     if (((psl_field_idx + 1) < c2b_psl_field_min) || ((psl_field_idx + 1) > c2b_psl_field_max)) {
         if ((psl_field_idx == 0) || (psl_field_idx == 17)) {
-            if ((c2b_globals.psl_state->headered_flag) && (c2b_globals.keep_header_flag) && (c2b_globals.header_line_idx <= 5)) {
+            if ((c2b_globals.psl->is_headered) && (c2b_globals.keep_header_flag) && (c2b_globals.header_line_idx <= 5)) {
                 /* copy header line to destination stream buffer */
                 char src_header_line_str[C2B_MAX_LINE_LENGTH_VALUE];
                 char dest_header_line_str[C2B_MAX_LINE_LENGTH_VALUE];
@@ -1247,7 +1247,7 @@ c2b_line_convert_psl_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
                 c2b_globals.header_line_idx++;
                 return;                    
             }
-            else if ((c2b_globals.psl_state->headered_flag) && (c2b_globals.header_line_idx <= 5)) {
+            else if ((c2b_globals.psl->is_headered) && (c2b_globals.header_line_idx <= 5)) {
                 c2b_globals.header_line_idx++;
                 return;
             }
@@ -1277,7 +1277,7 @@ c2b_line_convert_psl_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
     */
 
     if ((matches_val == 0) && (!isdigit(matches_str[0]))) {
-        if ((c2b_globals.psl_state->headered_flag) && (c2b_globals.keep_header_flag) && (c2b_globals.header_line_idx <= 5)) {
+        if ((c2b_globals.psl->is_headered) && (c2b_globals.keep_header_flag) && (c2b_globals.header_line_idx <= 5)) {
             /* copy header line to destination stream buffer */
             char src_header_line_str[C2B_MAX_LINE_LENGTH_VALUE];
             char dest_header_line_str[C2B_MAX_LINE_LENGTH_VALUE];
@@ -1643,8 +1643,8 @@ c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t
     cigar_str[cigar_size - 1] = '\0';
     c2b_sam_cigar_str_to_ops(cigar_str);
     ssize_t block_idx = 0;
-    for (block_idx = 0; block_idx < c2b_globals.sam_state->cigar->length; ++block_idx) {
-        cigar_length += c2b_globals.sam_state->cigar->ops[block_idx].bases;
+    for (block_idx = 0; block_idx < c2b_globals.sam->cigar->length; ++block_idx) {
+        cigar_length += c2b_globals.sam->cigar->ops[block_idx].bases;
     }
     sprintf(stop_str, "%" PRIu64 "\t", (is_mapped) ? pos_val + cigar_length - 1 : 1);
     memcpy(dest + *dest_size, stop_str, strlen(stop_str));
@@ -1776,12 +1776,12 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
     cigar_str[cigar_size - 1] = '\0';
     c2b_sam_cigar_str_to_ops(cigar_str);
 #ifdef DEBUG
-    c2b_sam_debug_cigar_ops(c2b_globals.sam_state->cigar);
+    c2b_sam_debug_cigar_ops(c2b_globals.sam->cigar);
 #endif
     ssize_t cigar_length = 0;
     ssize_t op_idx = 0;
-    for (op_idx = 0; op_idx < c2b_globals.sam_state->cigar->length; ++op_idx) {
-        cigar_length += c2b_globals.sam_state->cigar->ops[op_idx].bases;
+    for (op_idx = 0; op_idx < c2b_globals.sam->cigar->length; ++op_idx) {
+        cigar_length += c2b_globals.sam->cigar->ops[op_idx].bases;
     }
 
     /* 
@@ -1909,9 +1909,9 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
 
     char dest_line_str[C2B_MAX_LINE_LENGTH_VALUE];
     
-    for (op_idx = 0, block_idx = 1; op_idx < c2b_globals.sam_state->cigar->length; ++op_idx) {
-        char current_op = c2b_globals.sam_state->cigar->ops[op_idx].operation;
-        unsigned int bases = c2b_globals.sam_state->cigar->ops[op_idx].bases;
+    for (op_idx = 0, block_idx = 1; op_idx < c2b_globals.sam->cigar->length; ++op_idx) {
+        char current_op = c2b_globals.sam->cigar->ops[op_idx].operation;
+        unsigned int bases = c2b_globals.sam->cigar->ops[op_idx].bases;
         switch (current_op) 
             {
             case 'M':
@@ -1979,7 +1979,7 @@ c2b_sam_cigar_str_to_ops(char *s)
         curr_char = s[s_idx];
         if (isdigit(curr_char)) {
             if (operation_flag) {
-                c2b_globals.sam_state->cigar->ops[op_idx].bases = curr_bases;
+                c2b_globals.sam->cigar->ops[op_idx].bases = curr_bases;
                 op_idx++;
                 operation_flag = kFalse;
                 bases_flag = kTrue;
@@ -1995,14 +1995,14 @@ c2b_sam_cigar_str_to_ops(char *s)
                 bases_idx = 0;
                 memset(curr_bases_field, 0, strlen(curr_bases_field));
             }
-            c2b_globals.sam_state->cigar->ops[op_idx].operation = curr_char;
+            c2b_globals.sam->cigar->ops[op_idx].operation = curr_char;
             if (curr_char == '*') {
                 break;
             }
         }
     }
-    c2b_globals.sam_state->cigar->ops[op_idx].bases = curr_bases;
-    c2b_globals.sam_state->cigar->length = op_idx + 1;
+    c2b_globals.sam->cigar->ops[op_idx].bases = curr_bases;
+    c2b_globals.sam->cigar->length = op_idx + 1;
 }
 
 static void
@@ -2295,7 +2295,7 @@ c2b_line_convert_vcf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
 
     char dest_line_str[C2B_MAX_LINE_LENGTH_VALUE];
 
-    if ((!c2b_globals.vcf_state->do_not_split_flag) && (memchr(alt_str, c2b_vcf_alt_allele_delim, strlen(alt_str)))) {
+    if ((!c2b_globals.vcf->do_not_split) && (memchr(alt_str, c2b_vcf_alt_allele_delim, strlen(alt_str)))) {
 
         /* loop through each allele */
 
@@ -2309,13 +2309,13 @@ c2b_line_convert_vcf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
         const char *allele_tok;
         while ((allele_tok = c2b_strsep(&alt_alleles_copy, ",")) != NULL) {
             vcf.alt = (char *) allele_tok; /* discard const */
-            if ((c2b_globals.vcf_state->filter_count == 1) && (!c2b_globals.vcf_state->insertions_flag)) {
+            if ((c2b_globals.vcf->filter_count == 1) && (!c2b_globals.vcf->insertions)) {
                 vcf.end = start_val + abs(ref_size - strlen(vcf.alt)) + 1;
             }
-            if ( (c2b_globals.vcf_state->filter_count == 0) ||
-                 ((c2b_globals.vcf_state->snvs_flag) && (c2b_vcf_record_is_snv(ref_str, vcf.alt))) ||
-                 ((c2b_globals.vcf_state->insertions_flag) && (c2b_vcf_record_is_insertion(ref_str, vcf.alt))) ||
-                 ((c2b_globals.vcf_state->deletions_flag) && (c2b_vcf_record_is_deletion(ref_str, vcf.alt))) ) 
+            if ( (c2b_globals.vcf->filter_count == 0) ||
+                 ((c2b_globals.vcf->snvs) && (c2b_vcf_record_is_snv(ref_str, vcf.alt))) ||
+                 ((c2b_globals.vcf->insertions) && (c2b_vcf_record_is_insertion(ref_str, vcf.alt))) ||
+                 ((c2b_globals.vcf->deletions) && (c2b_vcf_record_is_deletion(ref_str, vcf.alt))) ) 
                 {
                     c2b_line_convert_vcf_to_bed(vcf, dest_line_str);
                     memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
@@ -2328,13 +2328,13 @@ c2b_line_convert_vcf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
 
         /* just print the one allele */
 
-        if ((c2b_globals.vcf_state->filter_count == 1) && (!c2b_globals.vcf_state->insertions_flag)) {
+        if ((c2b_globals.vcf->filter_count == 1) && (!c2b_globals.vcf->insertions)) {
             vcf.end = start_val + abs(ref_size - strlen(alt_str)) + 1;
         }
-        if ( (c2b_globals.vcf_state->filter_count == 0) ||
-             ((c2b_globals.vcf_state->snvs_flag) && (c2b_vcf_record_is_snv(ref_str, alt_str))) ||
-             ((c2b_globals.vcf_state->insertions_flag) && (c2b_vcf_record_is_insertion(ref_str, alt_str))) ||
-             ((c2b_globals.vcf_state->deletions_flag) && (c2b_vcf_record_is_deletion(ref_str, alt_str))) ) 
+        if ( (c2b_globals.vcf->filter_count == 0) ||
+             ((c2b_globals.vcf->snvs) && (c2b_vcf_record_is_snv(ref_str, alt_str))) ||
+             ((c2b_globals.vcf->insertions) && (c2b_vcf_record_is_insertion(ref_str, alt_str))) ||
+             ((c2b_globals.vcf->deletions) && (c2b_vcf_record_is_deletion(ref_str, alt_str))) ) 
             {
                 c2b_line_convert_vcf_to_bed(vcf, dest_line_str);
                 memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
@@ -2475,12 +2475,12 @@ c2b_line_convert_wig_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
        Initialize and increment parameters
     */
 
-    c2b_globals.wig_state->line++;
-    if (c2b_globals.wig_state->basename) {
-        sprintf(c2b_globals.wig_state->id,
+    c2b_globals.wig->line++;
+    if (c2b_globals.wig->basename) {
+        sprintf(c2b_globals.wig->id,
                 "%s.%u",
-                c2b_globals.wig_state->basename,
-                c2b_globals.wig_state->section);
+                c2b_globals.wig->basename,
+                c2b_globals.wig->section);
     }
 
     /* 
@@ -2488,18 +2488,18 @@ c2b_line_convert_wig_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
     */
     
     if (src[0] == c2b_wig_header_prefix) { 
-        if (c2b_globals.wig_state->start_write) {
-            c2b_globals.wig_state->start_write = kFalse;
-            sprintf(c2b_globals.wig_state->id, 
+        if (c2b_globals.wig->start_write) {
+            c2b_globals.wig->start_write = kFalse;
+            sprintf(c2b_globals.wig->id, 
                     "%s.%u",
-                    c2b_globals.wig_state->basename, 
-                    c2b_globals.wig_state->section);
+                    c2b_globals.wig->basename, 
+                    c2b_globals.wig->section);
         }
         if (c2b_globals.keep_header_flag) { 
             /* copy header line to destination stream buffer */
             memcpy(src_line_str, src, src_size);
             src_line_str[src_size] = '\0';
-            if (!c2b_globals.wig_state->basename) {
+            if (!c2b_globals.wig->basename) {
                 sprintf(dest_line_str, 
                         "%s\t%u\t%u\t%s\n", 
                         c2b_header_chr_name, 
@@ -2513,7 +2513,7 @@ c2b_line_convert_wig_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
                         c2b_header_chr_name, 
                         c2b_globals.header_line_idx, 
                         c2b_globals.header_line_idx + 1, 
-                        c2b_globals.wig_state->id,
+                        c2b_globals.wig->id,
                         src_line_str);
             }
             memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
@@ -2527,18 +2527,18 @@ c2b_line_convert_wig_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
     }
     else if ((strncmp(src, c2b_wig_track_prefix, strlen(c2b_wig_track_prefix)) == 0) || 
              (strncmp(src, c2b_wig_browser_prefix, strlen(c2b_wig_browser_prefix)) == 0)) {
-        if (c2b_globals.wig_state->start_write) {
-            c2b_globals.wig_state->start_write = kFalse;
-            sprintf(c2b_globals.wig_state->id,
+        if (c2b_globals.wig->start_write) {
+            c2b_globals.wig->start_write = kFalse;
+            sprintf(c2b_globals.wig->id,
                     "%s.%u",
-                    c2b_globals.wig_state->basename,
-                    c2b_globals.wig_state->section);
+                    c2b_globals.wig->basename,
+                    c2b_globals.wig->section);
         }
         if (c2b_globals.keep_header_flag) { 
             /* copy header line to destination stream buffer */
             memcpy(src_line_str, src, src_size);
             src_line_str[src_size] = '\0';
-            if (!c2b_globals.wig_state->basename) {
+            if (!c2b_globals.wig->basename) {
                 sprintf(dest_line_str, 
                         "%s\t%u\t%u\t%s\n", 
                         c2b_header_chr_name, 
@@ -2552,7 +2552,7 @@ c2b_line_convert_wig_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
                         c2b_header_chr_name, 
                         c2b_globals.header_line_idx, 
                         c2b_globals.header_line_idx + 1, 
-                        c2b_globals.wig_state->id,
+                        c2b_globals.wig->id,
                         src_line_str);
             }
             memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
@@ -2569,25 +2569,25 @@ c2b_line_convert_wig_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
         src_line_str[src_size] = '\0';
         int variable_step_fields = sscanf(src_line_str, 
                                           "variableStep chrom=%s span=%" SCNu64 "\n", 
-                                          c2b_globals.wig_state->chr, 
-                                          &(c2b_globals.wig_state->span));
+                                          c2b_globals.wig->chr, 
+                                          &(c2b_globals.wig->span));
         if (variable_step_fields < 1) {
-            fprintf(stderr, "Error: Invalid variableStep header on line %u\n", c2b_globals.wig_state->line);
+            fprintf(stderr, "Error: Invalid variableStep header on line %u\n", c2b_globals.wig->line);
             exit(EXIT_FAILURE);
         }
         if (variable_step_fields == 1)
-            c2b_globals.wig_state->span = 1;
-        c2b_globals.wig_state->is_fixed_step = kFalse;
-        if (c2b_globals.wig_state->start_write) {
-            c2b_globals.wig_state->start_write = kFalse;
-            sprintf(c2b_globals.wig_state->id,
+            c2b_globals.wig->span = 1;
+        c2b_globals.wig->is_fixed_step = kFalse;
+        if (c2b_globals.wig->start_write) {
+            c2b_globals.wig->start_write = kFalse;
+            sprintf(c2b_globals.wig->id,
                     "%s.%u",
-                    c2b_globals.wig_state->basename,
-                    c2b_globals.wig_state->section);
+                    c2b_globals.wig->basename,
+                    c2b_globals.wig->section);
         }
         if (c2b_globals.keep_header_flag) { 
             /* copy header line to destination stream buffer */
-            if (!c2b_globals.wig_state->basename) {
+            if (!c2b_globals.wig->basename) {
                 sprintf(dest_line_str, 
                         "%s\t%u\t%u\t%s\n", 
                         c2b_header_chr_name, 
@@ -2601,7 +2601,7 @@ c2b_line_convert_wig_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
                         c2b_header_chr_name, 
                         c2b_globals.header_line_idx, 
                         c2b_globals.header_line_idx + 1, 
-                        c2b_globals.wig_state->id,
+                        c2b_globals.wig->id,
                         src_line_str);
             }
             memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
@@ -2618,21 +2618,21 @@ c2b_line_convert_wig_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
         src_line_str[src_size] = '\0';
         int fixed_step_fields = sscanf(src_line_str, 
                                        "fixedStep chrom=%s start=%" SCNu64 " step=%" SCNu64 " span=%" SCNu64 "\n", 
-                                       c2b_globals.wig_state->chr, 
-                                       &(c2b_globals.wig_state->start_pos), 
-                                       &(c2b_globals.wig_state->step), 
-                                       &(c2b_globals.wig_state->span));
+                                       c2b_globals.wig->chr, 
+                                       &(c2b_globals.wig->start_pos), 
+                                       &(c2b_globals.wig->step), 
+                                       &(c2b_globals.wig->span));
         if (fixed_step_fields < 3) {
-            fprintf(stderr, "Error: Invalid fixedStep header on line %u\n", c2b_globals.wig_state->line);
+            fprintf(stderr, "Error: Invalid fixedStep header on line %u\n", c2b_globals.wig->line);
             exit(EXIT_FAILURE);
         }
         if (fixed_step_fields == 3) {
-            c2b_globals.wig_state->span = 1;
+            c2b_globals.wig->span = 1;
         }
-        c2b_globals.wig_state->is_fixed_step = kTrue;
+        c2b_globals.wig->is_fixed_step = kTrue;
         if (c2b_globals.keep_header_flag) { 
             /* copy header line to destination stream buffer */
-            if (!c2b_globals.wig_state->basename) {
+            if (!c2b_globals.wig->basename) {
                 sprintf(dest_line_str, 
                         "%s\t%u\t%u\t%s\n", 
                         c2b_header_chr_name, 
@@ -2646,7 +2646,7 @@ c2b_line_convert_wig_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
                         c2b_header_chr_name, 
                         c2b_globals.header_line_idx, 
                         c2b_globals.header_line_idx + 1, 
-                        c2b_globals.wig_state->id,
+                        c2b_globals.wig->id,
                         src_line_str);
             }
             memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
@@ -2663,27 +2663,27 @@ c2b_line_convert_wig_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
         src_line_str[src_size] = '\0';
         int bed_fields = sscanf(src_line_str, 
                                 "%s\t%" SCNu64 "\t%" SCNu64 "\t%lf\n", 
-                                c2b_globals.wig_state->chr,
-                                &(c2b_globals.wig_state->start_pos), 
-                                &(c2b_globals.wig_state->end_pos), 
-                                &(c2b_globals.wig_state->score));
+                                c2b_globals.wig->chr,
+                                &(c2b_globals.wig->start_pos), 
+                                &(c2b_globals.wig->end_pos), 
+                                &(c2b_globals.wig->score));
         if (bed_fields != 4) {
-            fprintf(stderr, "Error: Invalid WIG line %u\n", c2b_globals.wig_state->line);
+            fprintf(stderr, "Error: Invalid WIG line %u\n", c2b_globals.wig->line);
             exit(EXIT_FAILURE);
         }
-        c2b_globals.wig_state->pos_lines++;
-        if (!c2b_globals.wig_state->basename) {
+        c2b_globals.wig->pos_lines++;
+        if (!c2b_globals.wig->basename) {
             sprintf(dest_line_str,
                     "%s\t"                      \
                     "%" PRIu64 "\t"             \
                     "%" PRIu64 "\t"             \
                     "id-%d\t"                   \
                     "%lf\n",
-                    c2b_globals.wig_state->chr,
-                    c2b_globals.wig_state->start_pos - 1,
-                    c2b_globals.wig_state->end_pos - 1,
-                    c2b_globals.wig_state->pos_lines,
-                    c2b_globals.wig_state->score);
+                    c2b_globals.wig->chr,
+                    c2b_globals.wig->start_pos - 1,
+                    c2b_globals.wig->end_pos - 1,
+                    c2b_globals.wig->pos_lines,
+                    c2b_globals.wig->score);
         }
         else {
             sprintf(dest_line_str,
@@ -2692,14 +2692,14 @@ c2b_line_convert_wig_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
                     "%" PRIu64 "\t"             \
                     "%s-%d\t"                   \
                     "%lf\n",
-                    c2b_globals.wig_state->chr,
-                    c2b_globals.wig_state->start_pos - 1,
-                    c2b_globals.wig_state->end_pos - 1,
-                    c2b_globals.wig_state->id,
-                    c2b_globals.wig_state->pos_lines,
-                    c2b_globals.wig_state->score);
+                    c2b_globals.wig->chr,
+                    c2b_globals.wig->start_pos - 1,
+                    c2b_globals.wig->end_pos - 1,
+                    c2b_globals.wig->id,
+                    c2b_globals.wig->pos_lines,
+                    c2b_globals.wig->score);
         }
-        c2b_globals.wig_state->start_write = kTrue;
+        c2b_globals.wig->start_write = kTrue;
         memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
         *dest_size += strlen(dest_line_str);
     }
@@ -2707,26 +2707,26 @@ c2b_line_convert_wig_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
         memcpy(src_line_str, src, src_size);
         src_line_str[src_size] = '\0';
 
-        if (c2b_globals.wig_state->is_fixed_step) {
+        if (c2b_globals.wig->is_fixed_step) {
 
-            int fixed_step_column_fields = sscanf(src_line_str, "%lf\n", &(c2b_globals.wig_state->score));
+            int fixed_step_column_fields = sscanf(src_line_str, "%lf\n", &(c2b_globals.wig->score));
             if (fixed_step_column_fields != 1) {
-                fprintf(stderr, "B: Error: Invalid WIG line %u\n", c2b_globals.wig_state->line);
+                fprintf(stderr, "B: Error: Invalid WIG line %u\n", c2b_globals.wig->line);
                 exit(EXIT_FAILURE);
             }
-            c2b_globals.wig_state->pos_lines++;
-            if (!c2b_globals.wig_state->basename) {
+            c2b_globals.wig->pos_lines++;
+            if (!c2b_globals.wig->basename) {
                 sprintf(dest_line_str,
                         "%s\t"                  \
                         "%" PRIu64 "\t"         \
                         "%" PRIu64 "\t"         \
                         "id-%d\t"               \
                         "%lf\n",
-                        c2b_globals.wig_state->chr,
-                        c2b_globals.wig_state->start_pos - 1,
-                        c2b_globals.wig_state->start_pos + c2b_globals.wig_state->span - 1,
-                        c2b_globals.wig_state->pos_lines,
-                        c2b_globals.wig_state->score);
+                        c2b_globals.wig->chr,
+                        c2b_globals.wig->start_pos - 1,
+                        c2b_globals.wig->start_pos + c2b_globals.wig->span - 1,
+                        c2b_globals.wig->pos_lines,
+                        c2b_globals.wig->score);
             }
             else {
                 sprintf(dest_line_str,
@@ -2735,40 +2735,40 @@ c2b_line_convert_wig_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
                         "%" PRIu64 "\t"         \
                         "%s-%d\t"               \
                         "%lf\n",
-                        c2b_globals.wig_state->chr,
-                        c2b_globals.wig_state->start_pos - 1,
-                        c2b_globals.wig_state->start_pos + c2b_globals.wig_state->span - 1,
-                        c2b_globals.wig_state->id,
-                        c2b_globals.wig_state->pos_lines,
-                        c2b_globals.wig_state->score);
+                        c2b_globals.wig->chr,
+                        c2b_globals.wig->start_pos - 1,
+                        c2b_globals.wig->start_pos + c2b_globals.wig->span - 1,
+                        c2b_globals.wig->id,
+                        c2b_globals.wig->pos_lines,
+                        c2b_globals.wig->score);
             }            
-            c2b_globals.wig_state->start_pos += c2b_globals.wig_state->step;
-            c2b_globals.wig_state->start_write = kTrue;
+            c2b_globals.wig->start_pos += c2b_globals.wig->step;
+            c2b_globals.wig->start_write = kTrue;
             memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
             *dest_size += strlen(dest_line_str);
         }
         else {
             int variable_step_column_fields = sscanf(src_line_str, 
                                                      "%" SCNu64 "\t%lf\n", 
-                                                     &(c2b_globals.wig_state->start_pos), 
-                                                     &(c2b_globals.wig_state->score));
+                                                     &(c2b_globals.wig->start_pos), 
+                                                     &(c2b_globals.wig->score));
             if (variable_step_column_fields != 2) {
-                fprintf(stderr, "Error: Invalid WIG line %u\n", c2b_globals.wig_state->line);
+                fprintf(stderr, "Error: Invalid WIG line %u\n", c2b_globals.wig->line);
                 exit(EXIT_FAILURE);
             }
-            c2b_globals.wig_state->pos_lines++;
-            if (!c2b_globals.wig_state->basename) {
+            c2b_globals.wig->pos_lines++;
+            if (!c2b_globals.wig->basename) {
                 sprintf(dest_line_str,
                         "%s\t"                  \
                         "%" PRIu64 "\t"         \
                         "%" PRIu64 "\t"         \
                         "id-%d\t"               \
                         "%lf\n",
-                        c2b_globals.wig_state->chr,
-                        c2b_globals.wig_state->start_pos - 1,
-                        c2b_globals.wig_state->start_pos + c2b_globals.wig_state->span - 1,
-                        c2b_globals.wig_state->pos_lines,
-                        c2b_globals.wig_state->score);
+                        c2b_globals.wig->chr,
+                        c2b_globals.wig->start_pos - 1,
+                        c2b_globals.wig->start_pos + c2b_globals.wig->span - 1,
+                        c2b_globals.wig->pos_lines,
+                        c2b_globals.wig->score);
             }
             else {
                 sprintf(dest_line_str,
@@ -2777,15 +2777,15 @@ c2b_line_convert_wig_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
                         "%" PRIu64 "\t"         \
                         "%s-%d\t"               \
                         "%lf\n",
-                        c2b_globals.wig_state->chr,
-                        c2b_globals.wig_state->start_pos - 1,
-                        c2b_globals.wig_state->start_pos + c2b_globals.wig_state->span - 1,
-                        c2b_globals.wig_state->id,
-                        c2b_globals.wig_state->pos_lines,
-                        c2b_globals.wig_state->score);
+                        c2b_globals.wig->chr,
+                        c2b_globals.wig->start_pos - 1,
+                        c2b_globals.wig->start_pos + c2b_globals.wig->span - 1,
+                        c2b_globals.wig->id,
+                        c2b_globals.wig->pos_lines,
+                        c2b_globals.wig->score);
             }            
-            c2b_globals.wig_state->start_pos += c2b_globals.wig_state->step;
-            c2b_globals.wig_state->start_write = kTrue;
+            c2b_globals.wig->start_pos += c2b_globals.wig->step;
+            c2b_globals.wig->start_write = kTrue;
             memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
             *dest_size += strlen(dest_line_str);
         }
@@ -3315,7 +3315,7 @@ c2b_test_dependencies()
         free(samtools), samtools = NULL;
     }
 
-    if (c2b_globals.sort_params->sort_flag) {
+    if (c2b_globals.sort->is_enabled) {
         char *sort_bed = NULL;
         sort_bed = malloc(strlen(c2b_sort_bed) + 1);
         if (!sort_bed) {
@@ -3440,39 +3440,39 @@ c2b_print_matches(char *path, char *fn)
         if (c2b_is_there(candidate)) {
             found = kTrue;
             if (strcmp(fn, c2b_samtools) == 0) {
-                c2b_globals.sam_state->samtools_path = malloc(strlen(candidate) + 1);
-                if (!c2b_globals.sam_state->samtools_path) {
+                c2b_globals.sam->samtools_path = malloc(strlen(candidate) + 1);
+                if (!c2b_globals.sam->samtools_path) {
                     fprintf(stderr, "Error: Could not allocate space for storing samtools path global\n");
                     c2b_print_usage(stderr);
                     exit(EXIT_FAILURE);
                 }
-                memcpy(c2b_globals.sam_state->samtools_path, candidate, strlen(candidate) + 1);
+                memcpy(c2b_globals.sam->samtools_path, candidate, strlen(candidate) + 1);
             }
             else if (strcmp(fn, c2b_sort_bed) == 0) {
-                c2b_globals.sort_params->sort_bed_path = malloc(strlen(candidate) + 1);
-                if (!c2b_globals.sort_params->sort_bed_path) {
+                c2b_globals.sort->sort_bed_path = malloc(strlen(candidate) + 1);
+                if (!c2b_globals.sort->sort_bed_path) {
                     fprintf(stderr, "Error: Could not allocate space for storing sortbed path global\n");
                     c2b_print_usage(stderr);
                     exit(EXIT_FAILURE);
                 }
-                memcpy(c2b_globals.sort_params->sort_bed_path, candidate, strlen(candidate) + 1);
+                memcpy(c2b_globals.sort->sort_bed_path, candidate, strlen(candidate) + 1);
             }
             else if (strcmp(fn, c2b_starch) == 0) {
-                c2b_globals.starch_params->path = malloc(strlen(candidate) + 1);
-                if (!c2b_globals.starch_params->path) {
+                c2b_globals.starch->path = malloc(strlen(candidate) + 1);
+                if (!c2b_globals.starch->path) {
                     fprintf(stderr, "Error: Could not allocate space for storing starch path global\n");
                     c2b_print_usage(stderr);
                     exit(EXIT_FAILURE);
                 }
-                memcpy(c2b_globals.starch_params->path, candidate, strlen(candidate) + 1);
+                memcpy(c2b_globals.starch->path, candidate, strlen(candidate) + 1);
             }
             else if (strcmp(fn, c2b_cat) == 0) {
-                c2b_globals.cat_params->path = malloc(strlen(candidate) + 1);
-                if (!c2b_globals.cat_params->path) {
+                c2b_globals.cat->path = malloc(strlen(candidate) + 1);
+                if (!c2b_globals.cat->path) {
                     fprintf(stderr, "Errrpr: Could not allocate space for storing cat path global\n");
                     exit(EXIT_FAILURE);
                 }
-                memcpy(c2b_globals.cat_params->path, candidate, strlen(candidate) + 1);
+                memcpy(c2b_globals.cat->path, candidate, strlen(candidate) + 1);
             }
             break;
         }
@@ -3556,15 +3556,15 @@ c2b_init_globals()
     c2b_globals.keep_header_flag = kFalse;
     c2b_globals.split_flag = kFalse;
     c2b_globals.header_line_idx = 0U;
-    c2b_globals.gff_state = NULL, c2b_init_global_gff_state();
-    c2b_globals.gtf_state = NULL, c2b_init_global_gtf_state();
-    c2b_globals.psl_state = NULL, c2b_init_global_psl_state();
-    c2b_globals.sam_state = NULL, c2b_init_global_sam_state();
-    c2b_globals.vcf_state = NULL, c2b_init_global_vcf_state(); 
-    c2b_globals.wig_state = NULL, c2b_init_global_wig_state();
-    c2b_globals.cat_params = NULL, c2b_init_global_cat_params();
-    c2b_globals.sort_params = NULL, c2b_init_global_sort_params();
-    c2b_globals.starch_params = NULL, c2b_init_global_starch_params();
+    c2b_globals.gff = NULL, c2b_init_global_gff_state();
+    c2b_globals.gtf = NULL, c2b_init_global_gtf_state();
+    c2b_globals.psl = NULL, c2b_init_global_psl_state();
+    c2b_globals.sam = NULL, c2b_init_global_sam_state();
+    c2b_globals.vcf = NULL, c2b_init_global_vcf_state(); 
+    c2b_globals.wig = NULL, c2b_init_global_wig_state();
+    c2b_globals.cat = NULL, c2b_init_global_cat_params();
+    c2b_globals.sort = NULL, c2b_init_global_sort_params();
+    c2b_globals.starch = NULL, c2b_init_global_starch_params();
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_init_globals() - exit  ---\n");
@@ -3584,15 +3584,15 @@ c2b_delete_globals()
     c2b_globals.keep_header_flag = kFalse;
     c2b_globals.split_flag = kFalse;
     c2b_globals.header_line_idx = 0U;
-    if (c2b_globals.gff_state) c2b_delete_global_gff_state();
-    if (c2b_globals.gtf_state) c2b_delete_global_gtf_state();
-    if (c2b_globals.psl_state) c2b_delete_global_psl_state();
-    if (c2b_globals.sam_state) c2b_delete_global_sam_state();
-    if (c2b_globals.vcf_state) c2b_delete_global_vcf_state();
-    if (c2b_globals.wig_state) c2b_delete_global_wig_state();
-    if (c2b_globals.cat_params) c2b_delete_global_cat_params();
-    if (c2b_globals.sort_params) c2b_delete_global_sort_params();
-    if (c2b_globals.starch_params) c2b_delete_global_starch_params();
+    if (c2b_globals.gff) c2b_delete_global_gff_state();
+    if (c2b_globals.gtf) c2b_delete_global_gtf_state();
+    if (c2b_globals.psl) c2b_delete_global_psl_state();
+    if (c2b_globals.sam) c2b_delete_global_sam_state();
+    if (c2b_globals.vcf) c2b_delete_global_vcf_state();
+    if (c2b_globals.wig) c2b_delete_global_wig_state();
+    if (c2b_globals.cat) c2b_delete_global_cat_params();
+    if (c2b_globals.sort) c2b_delete_global_sort_params();
+    if (c2b_globals.starch) c2b_delete_global_starch_params();
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_delete_globals() - exit  ---\n");
@@ -3606,18 +3606,18 @@ c2b_init_global_gff_state()
     fprintf(stderr, "--- c2b_init_global_gff_state() - enter ---\n");
 #endif
 
-    c2b_globals.gff_state = malloc(sizeof(c2b_gff_state_t));
-    if (!c2b_globals.gff_state) {
+    c2b_globals.gff = malloc(sizeof(c2b_gff_state_t));
+    if (!c2b_globals.gff) {
         fprintf(stderr, "Error: Could not allocate space for GFF state global\n");
         exit(EXIT_FAILURE);
     }
 
-    c2b_globals.gff_state->id = malloc(C2B_MAX_FIELD_LENGTH_VALUE);
-    if (!c2b_globals.gff_state->id) {
+    c2b_globals.gff->id = malloc(C2B_MAX_FIELD_LENGTH_VALUE);
+    if (!c2b_globals.gff->id) {
         fprintf(stderr, "Error: Could not allocate space for GFF ID global\n");
         exit(EXIT_FAILURE);
     }
-    memset(c2b_globals.gff_state->id, 0, C2B_MAX_FIELD_LENGTH_VALUE);
+    memset(c2b_globals.gff->id, 0, C2B_MAX_FIELD_LENGTH_VALUE);
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_init_global_gff_state() - exit  ---\n");
@@ -3631,10 +3631,10 @@ c2b_delete_global_gff_state()
     fprintf(stderr, "--- c2b_delete_global_gff_state() - enter ---\n");
 #endif
 
-    if (c2b_globals.gff_state->id)
-        free(c2b_globals.gff_state->id), c2b_globals.gff_state->id = NULL;
+    if (c2b_globals.gff->id)
+        free(c2b_globals.gff->id), c2b_globals.gff->id = NULL;
 
-    free(c2b_globals.gff_state), c2b_globals.gff_state = NULL;
+    free(c2b_globals.gff), c2b_globals.gff = NULL;
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_delete_global_gff_state() - exit  ---\n");
@@ -3648,18 +3648,18 @@ c2b_init_global_gtf_state()
     fprintf(stderr, "--- c2b_init_global_gtf_state() - enter ---\n");
 #endif
 
-    c2b_globals.gtf_state = malloc(sizeof(c2b_gtf_state_t));
-    if (!c2b_globals.gtf_state) {
+    c2b_globals.gtf = malloc(sizeof(c2b_gtf_state_t));
+    if (!c2b_globals.gtf) {
         fprintf(stderr, "Error: Could not allocate space for GTF state global\n");
         exit(EXIT_FAILURE);
     }
 
-    c2b_globals.gtf_state->id = malloc(C2B_MAX_FIELD_LENGTH_VALUE);
-    if (!c2b_globals.gtf_state->id) {
+    c2b_globals.gtf->id = malloc(C2B_MAX_FIELD_LENGTH_VALUE);
+    if (!c2b_globals.gtf->id) {
         fprintf(stderr, "Error: Could not allocate space for GTF ID global\n");
         exit(EXIT_FAILURE);
     }
-    memset(c2b_globals.gtf_state->id, 0, C2B_MAX_FIELD_LENGTH_VALUE);
+    memset(c2b_globals.gtf->id, 0, C2B_MAX_FIELD_LENGTH_VALUE);
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_init_global_gtf_state() - exit  ---\n");
@@ -3673,10 +3673,10 @@ c2b_delete_global_gtf_state()
     fprintf(stderr, "--- c2b_delete_global_gtf_state() - enter ---\n");
 #endif
 
-    if (c2b_globals.gtf_state->id)
-        free(c2b_globals.gtf_state->id), c2b_globals.gtf_state->id = NULL;
+    if (c2b_globals.gtf->id)
+        free(c2b_globals.gtf->id), c2b_globals.gtf->id = NULL;
 
-    free(c2b_globals.gtf_state), c2b_globals.gtf_state = NULL;
+    free(c2b_globals.gtf), c2b_globals.gtf = NULL;
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_delete_global_gtf_state() - exit  ---\n");
@@ -3690,13 +3690,13 @@ c2b_init_global_psl_state()
     fprintf(stderr, "--- c2b_init_global_psl_state() - enter ---\n");
 #endif
 
-    c2b_globals.psl_state = malloc(sizeof(c2b_psl_state_t));
-    if (!c2b_globals.psl_state) {
+    c2b_globals.psl = malloc(sizeof(c2b_psl_state_t));
+    if (!c2b_globals.psl) {
         fprintf(stderr, "Error: Could not allocate space for PSL state global\n");
         exit(EXIT_FAILURE);
     }
 
-    c2b_globals.psl_state->headered_flag = kTrue;
+    c2b_globals.psl->is_headered = kTrue;
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_init_global_psl_state() - exit  ---\n");
@@ -3710,7 +3710,7 @@ c2b_delete_global_psl_state()
     fprintf(stderr, "--- c2b_delete_global_psl_state() - enter ---\n");
 #endif
 
-    free(c2b_globals.psl_state), c2b_globals.psl_state = NULL;
+    free(c2b_globals.psl), c2b_globals.psl = NULL;
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_delete_global_psl_state() - exit  ---\n");
@@ -3724,15 +3724,15 @@ c2b_init_global_sam_state()
     fprintf(stderr, "--- c2b_init_global_sam_state() - enter ---\n");
 #endif
 
-    c2b_globals.sam_state = malloc(sizeof(c2b_sam_state_t));
-    if (!c2b_globals.sam_state) {
+    c2b_globals.sam = malloc(sizeof(c2b_sam_state_t));
+    if (!c2b_globals.sam) {
         fprintf(stderr, "Error: Could not allocate space for SAM state global\n");
         exit(EXIT_FAILURE);
     }
 
-    c2b_globals.sam_state->samtools_path = NULL;
+    c2b_globals.sam->samtools_path = NULL;
 
-    c2b_globals.sam_state->cigar = NULL, c2b_sam_init_cigar_ops(&(c2b_globals.sam_state->cigar), C2B_MAX_OPERATIONS_VALUE);
+    c2b_globals.sam->cigar = NULL, c2b_sam_init_cigar_ops(&(c2b_globals.sam->cigar), C2B_MAX_OPERATIONS_VALUE);
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_init_global_sam_state() - exit  ---\n");
@@ -3746,13 +3746,13 @@ c2b_delete_global_sam_state()
     fprintf(stderr, "--- c2b_delete_global_sam_state() - enter ---\n");
 #endif
 
-    if (c2b_globals.sam_state->samtools_path)
-        free(c2b_globals.sam_state->samtools_path), c2b_globals.sam_state->samtools_path = NULL;
+    if (c2b_globals.sam->samtools_path)
+        free(c2b_globals.sam->samtools_path), c2b_globals.sam->samtools_path = NULL;
     
-    if (c2b_globals.sam_state->cigar)
-        c2b_sam_delete_cigar_ops(c2b_globals.sam_state->cigar);
+    if (c2b_globals.sam->cigar)
+        c2b_sam_delete_cigar_ops(c2b_globals.sam->cigar);
     
-    free(c2b_globals.sam_state), c2b_globals.sam_state = NULL;
+    free(c2b_globals.sam), c2b_globals.sam = NULL;
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_delete_global_sam_state() - exit  ---\n");
@@ -3766,17 +3766,17 @@ c2b_init_global_vcf_state()
     fprintf(stderr, "--- c2b_init_global_vcf_state() - enter ---\n");
 #endif
     
-    c2b_globals.vcf_state = malloc(sizeof(c2b_vcf_state_t));
-    if (!c2b_globals.vcf_state) {
+    c2b_globals.vcf = malloc(sizeof(c2b_vcf_state_t));
+    if (!c2b_globals.vcf) {
         fprintf(stderr, "Error: Could not allocate space for VCF state global\n");
         exit(EXIT_FAILURE);
     }
     
-    c2b_globals.vcf_state->do_not_split_flag = kFalse;
-    c2b_globals.vcf_state->snvs_flag = kFalse;
-    c2b_globals.vcf_state->insertions_flag = kFalse;
-    c2b_globals.vcf_state->deletions_flag = kFalse;    
-    c2b_globals.vcf_state->filter_count = 0U;
+    c2b_globals.vcf->do_not_split = kFalse;
+    c2b_globals.vcf->snvs = kFalse;
+    c2b_globals.vcf->insertions = kFalse;
+    c2b_globals.vcf->deletions = kFalse;    
+    c2b_globals.vcf->filter_count = 0U;
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_init_global_vcf_state() - exit  ---\n");
@@ -3790,7 +3790,7 @@ c2b_delete_global_vcf_state()
     fprintf(stderr, "--- c2b_delete_global_vcf_state() - enter ---\n");
 #endif
 
-    free(c2b_globals.vcf_state), c2b_globals.vcf_state = NULL;
+    free(c2b_globals.vcf), c2b_globals.vcf = NULL;
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_delete_global_vcf_state() - exit  ---\n");
@@ -3804,39 +3804,39 @@ c2b_init_global_wig_state()
     fprintf(stderr, "--- c2b_init_global_wig_state() - enter ---\n");
 #endif
 
-    c2b_globals.wig_state = malloc(sizeof(c2b_wig_state_t));
-    if (!c2b_globals.wig_state) {
+    c2b_globals.wig = malloc(sizeof(c2b_wig_state_t));
+    if (!c2b_globals.wig) {
         fprintf(stderr, "Error: Could not allocate space for WIG state global\n");
         exit(EXIT_FAILURE);
     }
 
-    c2b_globals.wig_state->section = 1;
-    c2b_globals.wig_state->line = 0;
-    c2b_globals.wig_state->pos_lines = 0;
-    c2b_globals.wig_state->span = 0;
-    c2b_globals.wig_state->step = 0;
-    c2b_globals.wig_state->start_pos = 0;
-    c2b_globals.wig_state->end_pos = 0;
-    c2b_globals.wig_state->score = 0.0f;
-    c2b_globals.wig_state->chr = NULL;
-    c2b_globals.wig_state->id = NULL;
-    c2b_globals.wig_state->is_fixed_step = kFalse;
-    c2b_globals.wig_state->start_write = kFalse;
-    c2b_globals.wig_state->basename = NULL;
+    c2b_globals.wig->section = 1;
+    c2b_globals.wig->line = 0;
+    c2b_globals.wig->pos_lines = 0;
+    c2b_globals.wig->span = 0;
+    c2b_globals.wig->step = 0;
+    c2b_globals.wig->start_pos = 0;
+    c2b_globals.wig->end_pos = 0;
+    c2b_globals.wig->score = 0.0f;
+    c2b_globals.wig->chr = NULL;
+    c2b_globals.wig->id = NULL;
+    c2b_globals.wig->is_fixed_step = kFalse;
+    c2b_globals.wig->start_write = kFalse;
+    c2b_globals.wig->basename = NULL;
 
-    c2b_globals.wig_state->chr = malloc(C2B_MAX_CHROMOSOME_LENGTH);
-    if (!c2b_globals.wig_state->chr) {
+    c2b_globals.wig->chr = malloc(C2B_MAX_CHROMOSOME_LENGTH);
+    if (!c2b_globals.wig->chr) {
         fprintf(stderr, "Error: Could not allocate space for global WIG chromosome string\n");
         exit(EXIT_FAILURE);
     }
-    memset(c2b_globals.wig_state->chr, 0, C2B_MAX_CHROMOSOME_LENGTH);
+    memset(c2b_globals.wig->chr, 0, C2B_MAX_CHROMOSOME_LENGTH);
 
-    c2b_globals.wig_state->id = malloc(C2B_MAX_FIELD_LENGTH_VALUE);
-    if (!c2b_globals.wig_state->id) {
+    c2b_globals.wig->id = malloc(C2B_MAX_FIELD_LENGTH_VALUE);
+    if (!c2b_globals.wig->id) {
         fprintf(stderr, "Error: Could not allocate space for global WIG ID string\n");
         exit(EXIT_FAILURE);
     }
-    memset(c2b_globals.wig_state->id, 0, C2B_MAX_FIELD_LENGTH_VALUE);
+    memset(c2b_globals.wig->id, 0, C2B_MAX_FIELD_LENGTH_VALUE);
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_init_global_wig_state() - exit  ---\n");
@@ -3850,16 +3850,16 @@ c2b_delete_global_wig_state()
     fprintf(stderr, "--- c2b_delete_global_wig_state() - enter ---\n");
 #endif
 
-    if (c2b_globals.wig_state->chr)
-        free(c2b_globals.wig_state->chr), c2b_globals.wig_state->chr = NULL;
+    if (c2b_globals.wig->chr)
+        free(c2b_globals.wig->chr), c2b_globals.wig->chr = NULL;
 
-    if (c2b_globals.wig_state->id)
-        free(c2b_globals.wig_state->id), c2b_globals.wig_state->id = NULL;
+    if (c2b_globals.wig->id)
+        free(c2b_globals.wig->id), c2b_globals.wig->id = NULL;
 
-    if (c2b_globals.wig_state->basename)
-        free(c2b_globals.wig_state->basename), c2b_globals.wig_state->basename = NULL;
+    if (c2b_globals.wig->basename)
+        free(c2b_globals.wig->basename), c2b_globals.wig->basename = NULL;
 
-    free(c2b_globals.wig_state), c2b_globals.wig_state = NULL;
+    free(c2b_globals.wig), c2b_globals.wig = NULL;
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_delete_global_wig_state() - exit  ---\n");
@@ -3873,13 +3873,13 @@ c2b_init_global_cat_params()
     fprintf(stderr, "--- c2b_init_global_cat_params() - enter ---\n");
 #endif
 
-    c2b_globals.cat_params = malloc(sizeof(c2b_cat_params_t));
-    if (!c2b_globals.cat_params) {
+    c2b_globals.cat = malloc(sizeof(c2b_cat_params_t));
+    if (!c2b_globals.cat) {
         fprintf(stderr, "Error: Could not allocate space for cat parameters global\n");
         exit(EXIT_FAILURE);
     }
 
-    c2b_globals.cat_params->path = NULL;
+    c2b_globals.cat->path = NULL;
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_init_global_cat_params() - exit  ---\n");
@@ -3893,10 +3893,10 @@ c2b_delete_global_cat_params()
     fprintf(stderr, "--- c2b_delete_global_cat_params() - enter ---\n");
 #endif
 
-    if (c2b_globals.cat_params->path)
-        free(c2b_globals.cat_params->path), c2b_globals.cat_params->path = NULL;
+    if (c2b_globals.cat->path)
+        free(c2b_globals.cat->path), c2b_globals.cat->path = NULL;
 
-    free(c2b_globals.cat_params), c2b_globals.cat_params = NULL;
+    free(c2b_globals.cat), c2b_globals.cat = NULL;
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_delete_global_cat_params() - exit  ---\n");
@@ -3910,16 +3910,16 @@ c2b_init_global_sort_params()
     fprintf(stderr, "--- c2b_init_global_sort_params() - enter ---\n");
 #endif
 
-    c2b_globals.sort_params = malloc(sizeof(c2b_sort_params_t));
-    if (!c2b_globals.sort_params) {
+    c2b_globals.sort = malloc(sizeof(c2b_sort_params_t));
+    if (!c2b_globals.sort) {
         fprintf(stderr, "Error: Could not allocate space for sort parameters global\n");
         exit(EXIT_FAILURE);
     }
 
-    c2b_globals.sort_params->sort_flag = kTrue;
-    c2b_globals.sort_params->sort_bed_path = NULL;
-    c2b_globals.sort_params->max_mem_value = NULL;
-    c2b_globals.sort_params->sort_tmpdir_path = NULL;
+    c2b_globals.sort->is_enabled = kTrue;
+    c2b_globals.sort->sort_bed_path = NULL;
+    c2b_globals.sort->max_mem_value = NULL;
+    c2b_globals.sort->sort_tmpdir_path = NULL;
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_init_global_sort_params() - exit  ---\n");
@@ -3933,16 +3933,16 @@ c2b_delete_global_sort_params()
     fprintf(stderr, "--- c2b_delete_global_sort_params() - enter ---\n");
 #endif
 
-    if (c2b_globals.sort_params->max_mem_value)
-        free(c2b_globals.sort_params->max_mem_value), c2b_globals.sort_params->max_mem_value = NULL;
+    if (c2b_globals.sort->max_mem_value)
+        free(c2b_globals.sort->max_mem_value), c2b_globals.sort->max_mem_value = NULL;
 
-    if (c2b_globals.sort_params->sort_bed_path)
-        free(c2b_globals.sort_params->sort_bed_path), c2b_globals.sort_params->sort_bed_path = NULL;
+    if (c2b_globals.sort->sort_bed_path)
+        free(c2b_globals.sort->sort_bed_path), c2b_globals.sort->sort_bed_path = NULL;
 
-    if (c2b_globals.sort_params->sort_tmpdir_path)
-        free(c2b_globals.sort_params->sort_tmpdir_path), c2b_globals.sort_params->sort_tmpdir_path = NULL;
+    if (c2b_globals.sort->sort_tmpdir_path)
+        free(c2b_globals.sort->sort_tmpdir_path), c2b_globals.sort->sort_tmpdir_path = NULL;
 
-    free(c2b_globals.sort_params), c2b_globals.sort_params = NULL;
+    free(c2b_globals.sort), c2b_globals.sort = NULL;
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_delete_global_sort_params() - exit  ---\n");
@@ -3956,16 +3956,16 @@ c2b_init_global_starch_params()
     fprintf(stderr, "--- c2b_init_global_starch_params() - enter ---\n");
 #endif
 
-    c2b_globals.starch_params = malloc(sizeof(c2b_starch_params_t));
-    if (!c2b_globals.starch_params) {
+    c2b_globals.starch = malloc(sizeof(c2b_starch_params_t));
+    if (!c2b_globals.starch) {
         fprintf(stderr, "Error: Could not allocate space for starch parameters global\n");
         exit(EXIT_FAILURE);
     }
 
-    c2b_globals.starch_params->path = NULL;
-    c2b_globals.starch_params->bzip2_flag = kFalse;
-    c2b_globals.starch_params->gzip_flag = kFalse;
-    c2b_globals.starch_params->note = NULL;
+    c2b_globals.starch->path = NULL;
+    c2b_globals.starch->bzip2 = kFalse;
+    c2b_globals.starch->gzip = kFalse;
+    c2b_globals.starch->note = NULL;
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_init_global_starch_params() - exit  ---\n");
@@ -3979,13 +3979,13 @@ c2b_delete_global_starch_params()
     fprintf(stderr, "--- c2b_delete_global_starch_params() - enter ---\n");
 #endif
 
-    if (c2b_globals.starch_params->path)
-        free(c2b_globals.starch_params->path), c2b_globals.starch_params->path = NULL;
+    if (c2b_globals.starch->path)
+        free(c2b_globals.starch->path), c2b_globals.starch->path = NULL;
 
-    if (c2b_globals.starch_params->note)
-        free(c2b_globals.starch_params->note), c2b_globals.starch_params->note = NULL;
+    if (c2b_globals.starch->note)
+        free(c2b_globals.starch->note), c2b_globals.starch->note = NULL;
 
-    free(c2b_globals.starch_params), c2b_globals.starch_params = NULL;
+    free(c2b_globals.starch), c2b_globals.starch = NULL;
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_delete_global_starch_params() - exit  ---\n");
@@ -4038,61 +4038,61 @@ c2b_init_command_line_options(int argc, char **argv)
                 free(output_format), output_format = NULL;
                 break;
             case 'm':
-                c2b_globals.sort_params->max_mem_value = malloc(strlen(optarg) + 1);
-                if (!c2b_globals.sort_params->max_mem_value) {
+                c2b_globals.sort->max_mem_value = malloc(strlen(optarg) + 1);
+                if (!c2b_globals.sort->max_mem_value) {
                     fprintf(stderr, "Error: Could not allocate space for sort-bed max-mem argument\n");
                     c2b_print_usage(stderr);
                     exit(EXIT_FAILURE);
                 }
-                memcpy(c2b_globals.sort_params->max_mem_value, optarg, strlen(optarg) + 1);
+                memcpy(c2b_globals.sort->max_mem_value, optarg, strlen(optarg) + 1);
                 break;
             case 'r':
-                c2b_globals.sort_params->sort_tmpdir_path = malloc(strlen(optarg) + 1);
-                if (!c2b_globals.sort_params->sort_tmpdir_path) {
+                c2b_globals.sort->sort_tmpdir_path = malloc(strlen(optarg) + 1);
+                if (!c2b_globals.sort->sort_tmpdir_path) {
                     fprintf(stderr, "Error: Could not allocate space for sort-bed temporary directory argument\n");
                     c2b_print_usage(stderr);
                     exit(EXIT_FAILURE);
                 }
-                memcpy(c2b_globals.sort_params->sort_tmpdir_path, optarg, strlen(optarg) + 1);
+                memcpy(c2b_globals.sort->sort_tmpdir_path, optarg, strlen(optarg) + 1);
                 break;
             case 'e':
-                c2b_globals.starch_params->note = malloc(strlen(optarg) + 1);
-                if (!c2b_globals.starch_params->note) {
+                c2b_globals.starch->note = malloc(strlen(optarg) + 1);
+                if (!c2b_globals.starch->note) {
                     fprintf(stderr, "Error: Could not allocate space for Starch note\n");
                     c2b_print_usage(stderr);
                     exit(EXIT_FAILURE);
                 }
-                memcpy(c2b_globals.starch_params->note, optarg, strlen(optarg) + 1);
+                memcpy(c2b_globals.starch->note, optarg, strlen(optarg) + 1);
                 break;
             case 'b':
-                c2b_globals.wig_state->basename = malloc(strlen(optarg) + 1);
-                if (!c2b_globals.wig_state->basename) {
+                c2b_globals.wig->basename = malloc(strlen(optarg) + 1);
+                if (!c2b_globals.wig->basename) {
                     fprintf(stderr, "Error: Could not allocate space for WIG basename\n");
                     c2b_print_usage(stderr);
                     exit(EXIT_FAILURE);
                 }
-                memcpy(c2b_globals.wig_state->basename, optarg, strlen(optarg) + 1);
+                memcpy(c2b_globals.wig->basename, optarg, strlen(optarg) + 1);
                 break;
             case 's':
                 c2b_globals.split_flag = kTrue;
                 break;
             case 'p':
-                c2b_globals.vcf_state->do_not_split_flag = kTrue;
+                c2b_globals.vcf->do_not_split = kTrue;
                 break;
             case 'v':
-                c2b_globals.vcf_state->filter_count++;
-                c2b_globals.vcf_state->snvs_flag = kTrue;
+                c2b_globals.vcf->filter_count++;
+                c2b_globals.vcf->snvs = kTrue;
                 break;
             case 't':
-                c2b_globals.vcf_state->filter_count++;
-                c2b_globals.vcf_state->insertions_flag = kTrue;
+                c2b_globals.vcf->filter_count++;
+                c2b_globals.vcf->insertions = kTrue;
                 break;
             case 'n':
-                c2b_globals.vcf_state->filter_count++;
-                c2b_globals.vcf_state->deletions_flag = kTrue;
+                c2b_globals.vcf->filter_count++;
+                c2b_globals.vcf->deletions = kTrue;
                 break;
             case 'd':
-                c2b_globals.sort_params->sort_flag = kFalse;
+                c2b_globals.sort->is_enabled = kFalse;
                 break;
             case 'a':
                 c2b_globals.all_reads_flag = kTrue;
@@ -4101,10 +4101,10 @@ c2b_init_command_line_options(int argc, char **argv)
                 c2b_globals.keep_header_flag = kTrue;
                 break;
             case 'z':
-                c2b_globals.starch_params->bzip2_flag = kTrue;
+                c2b_globals.starch->bzip2 = kTrue;
                 break;
             case 'g':
-                c2b_globals.starch_params->gzip_flag = kTrue;
+                c2b_globals.starch->gzip = kTrue;
                 break;
             case 'h':
                 c2b_print_usage(stdout);
@@ -4138,22 +4138,22 @@ c2b_init_command_line_options(int argc, char **argv)
         c2b_globals.output_format_idx = c2b_to_output_format(c2b_globals.output_format);
     }
 
-    if ((c2b_globals.input_format_idx == VCF_FORMAT) && (c2b_globals.vcf_state->filter_count > 1)) {
+    if ((c2b_globals.input_format_idx == VCF_FORMAT) && (c2b_globals.vcf->filter_count > 1)) {
         fprintf(stderr, "Error: Cannot specify more than one VCF variant filter option\n");
         c2b_print_usage(stderr);
         exit(EXIT_FAILURE);
     }
     
-    if ((c2b_globals.starch_params->bzip2_flag) && (c2b_globals.starch_params->gzip_flag)) {
+    if ((c2b_globals.starch->bzip2) && (c2b_globals.starch->gzip)) {
         fprintf(stderr, "Error: Cannot specify both Starch compression options\n");
         c2b_print_usage(stderr);
         exit(EXIT_FAILURE);
     }
 
-    if (!(c2b_globals.starch_params->bzip2_flag) && !(c2b_globals.starch_params->gzip_flag) && (c2b_globals.output_format_idx == STARCH_FORMAT)) {
-        c2b_globals.starch_params->bzip2_flag = kTrue;
+    if (!(c2b_globals.starch->bzip2) && !(c2b_globals.starch->gzip) && (c2b_globals.output_format_idx == STARCH_FORMAT)) {
+        c2b_globals.starch->bzip2 = kTrue;
     }
-    else if ((c2b_globals.starch_params->bzip2_flag || c2b_globals.starch_params->gzip_flag) && (c2b_globals.output_format_idx == BED_FORMAT)) {
+    else if ((c2b_globals.starch->bzip2 || c2b_globals.starch->gzip) && (c2b_globals.output_format_idx == BED_FORMAT)) {
         fprintf(stderr, "Error: Cannot specify Starch compression options without setting output format to Starch\n");
         c2b_print_usage(stderr);
         exit(EXIT_FAILURE);

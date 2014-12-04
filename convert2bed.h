@@ -531,7 +531,7 @@ typedef struct gtf_state {
 } c2b_gtf_state_t;
 
 typedef struct psl_state {
-    boolean headered_flag;
+    boolean is_headered;
 } c2b_psl_state_t;
 
 typedef struct sam_state {
@@ -540,10 +540,10 @@ typedef struct sam_state {
 } c2b_sam_state_t;
 
 typedef struct vcf_state {
-    boolean do_not_split_flag;
-    boolean snvs_flag;
-    boolean insertions_flag;
-    boolean deletions_flag;
+    boolean do_not_split;
+    boolean snvs;
+    boolean insertions;
+    boolean deletions;
     unsigned int filter_count;
 } c2b_vcf_state_t;
 
@@ -568,7 +568,7 @@ typedef struct cat_params {
 } c2b_cat_params_t;
 
 typedef struct sort_params {
-    boolean sort_flag;
+    boolean is_enabled;
     char *sort_bed_path;
     char *max_mem_value;
     char *sort_tmpdir_path;
@@ -576,8 +576,8 @@ typedef struct sort_params {
 
 typedef struct starch_params {
     char *path;
-    boolean bzip2_flag;
-    boolean gzip_flag;
+    boolean bzip2;
+    boolean gzip;
     char *note;
 } c2b_starch_params_t;
 
@@ -590,15 +590,15 @@ static struct globals {
     boolean all_reads_flag;
     boolean keep_header_flag;
     boolean split_flag;
-    c2b_gff_state_t *gff_state;
-    c2b_gtf_state_t *gtf_state;
-    c2b_psl_state_t *psl_state;
-    c2b_sam_state_t *sam_state;
-    c2b_vcf_state_t *vcf_state;
-    c2b_wig_state_t *wig_state;
-    c2b_cat_params_t *cat_params;
-    c2b_sort_params_t *sort_params;
-    c2b_starch_params_t *starch_params;
+    c2b_gff_state_t *gff;
+    c2b_gtf_state_t *gtf;
+    c2b_psl_state_t *psl;
+    c2b_sam_state_t *sam;
+    c2b_vcf_state_t *vcf;
+    c2b_wig_state_t *wig;
+    c2b_cat_params_t *cat;
+    c2b_sort_params_t *sort;
+    c2b_starch_params_t *starch;
 } c2b_globals;
 
 static struct option c2b_client_long_options[] = {
