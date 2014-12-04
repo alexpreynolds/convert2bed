@@ -614,12 +614,12 @@ c2b_cmd_cat_stdin(char *cmd)
     
     /* /path/to/cat - */
     memcpy(cmd,
-           c2b_globals.cat_path,
-           strlen(c2b_globals.cat_path));
-    memcpy(cmd + strlen(c2b_globals.cat_path),
+           c2b_globals.cat_params->path,
+           strlen(c2b_globals.cat_params->path));
+    memcpy(cmd + strlen(c2b_globals.cat_params->path),
            cat_args,
            strlen(cat_args));
-    cmd[strlen(c2b_globals.cat_path) + strlen(cat_args)] = '\0';
+    cmd[strlen(c2b_globals.cat_params->path) + strlen(cat_args)] = '\0';
 }
 
 static inline void
@@ -3467,12 +3467,12 @@ c2b_print_matches(char *path, char *fn)
                 memcpy(c2b_globals.starch_params->path, candidate, strlen(candidate) + 1);
             }
             else if (strcmp(fn, c2b_cat) == 0) {
-                c2b_globals.cat_path = malloc(strlen(candidate) + 1);
-                if (!c2b_globals.cat_path) {
+                c2b_globals.cat_params->path = malloc(strlen(candidate) + 1);
+                if (!c2b_globals.cat_params->path) {
                     fprintf(stderr, "Errrpr: Could not allocate space for storing cat path global\n");
                     exit(EXIT_FAILURE);
                 }
-                memcpy(c2b_globals.cat_path, candidate, strlen(candidate) + 1);
+                memcpy(c2b_globals.cat_params->path, candidate, strlen(candidate) + 1);
             }
             break;
         }
@@ -3552,7 +3552,6 @@ c2b_init_globals()
     c2b_globals.input_format_idx = UNDEFINED_FORMAT;
     c2b_globals.output_format = NULL;
     c2b_globals.output_format_idx = UNDEFINED_FORMAT;
-    c2b_globals.cat_path = NULL;
     c2b_globals.all_reads_flag = kFalse;
     c2b_globals.keep_header_flag = kFalse;
     c2b_globals.split_flag = kFalse;
@@ -3563,6 +3562,7 @@ c2b_init_globals()
     c2b_globals.sam_state = NULL, c2b_init_global_sam_state();
     c2b_globals.vcf_state = NULL, c2b_init_global_vcf_state(); 
     c2b_globals.wig_state = NULL, c2b_init_global_wig_state();
+    c2b_globals.cat_params = NULL, c2b_init_global_cat_params();
     c2b_globals.sort_params = NULL, c2b_init_global_sort_params();
     c2b_globals.starch_params = NULL, c2b_init_global_starch_params();
 
@@ -3579,7 +3579,6 @@ c2b_delete_globals()
 #endif
 
     if (c2b_globals.input_format) free(c2b_globals.input_format), c2b_globals.input_format = NULL;
-    if (c2b_globals.cat_path) free(c2b_globals.cat_path), c2b_globals.cat_path = NULL;
     c2b_globals.input_format_idx = UNDEFINED_FORMAT;
     c2b_globals.all_reads_flag = kFalse;
     c2b_globals.keep_header_flag = kFalse;
@@ -3591,6 +3590,7 @@ c2b_delete_globals()
     if (c2b_globals.sam_state) c2b_delete_global_sam_state();
     if (c2b_globals.vcf_state) c2b_delete_global_vcf_state();
     if (c2b_globals.wig_state) c2b_delete_global_wig_state();
+    if (c2b_globals.cat_params) c2b_delete_global_cat_params();
     if (c2b_globals.sort_params) c2b_delete_global_sort_params();
     if (c2b_globals.starch_params) c2b_delete_global_starch_params();
 
@@ -3867,6 +3867,43 @@ c2b_delete_global_wig_state()
 }
 
 static void
+c2b_init_global_cat_params()
+{
+#ifdef DEBUG
+    fprintf(stderr, "--- c2b_init_global_cat_params() - enter ---\n");
+#endif
+
+    c2b_globals.cat_params = malloc(sizeof(c2b_cat_params_t));
+    if (!c2b_globals.cat_params) {
+        fprintf(stderr, "Error: Could not allocate space for cat parameters global\n");
+        exit(EXIT_FAILURE);
+    }
+
+    c2b_globals.cat_params->path = NULL;
+
+#ifdef DEBUG
+    fprintf(stderr, "--- c2b_init_global_cat_params() - exit  ---\n");
+#endif
+}
+
+static void
+c2b_delete_global_cat_params()
+{
+#ifdef DEBUG
+    fprintf(stderr, "--- c2b_delete_global_cat_params() - enter ---\n");
+#endif
+
+    if (c2b_globals.cat_params->path)
+        free(c2b_globals.cat_params->path), c2b_globals.cat_params->path = NULL;
+
+    free(c2b_globals.cat_params), c2b_globals.cat_params = NULL;
+
+#ifdef DEBUG
+    fprintf(stderr, "--- c2b_delete_global_cat_params() - exit  ---\n");
+#endif
+}
+
+static void
 c2b_init_global_sort_params()
 {
 #ifdef DEBUG
@@ -3895,8 +3932,6 @@ c2b_delete_global_sort_params()
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_delete_global_sort_params() - enter ---\n");
 #endif
-
-    c2b_globals.sort_params->sort_flag = kTrue;
 
     if (c2b_globals.sort_params->max_mem_value)
         free(c2b_globals.sort_params->max_mem_value), c2b_globals.sort_params->max_mem_value = NULL;
@@ -4137,7 +4172,7 @@ c2b_print_usage(FILE *stream)
 #endif
 
     fprintf(stream,
-            "%s\n" \
+            "%s\n"            \
             "  version: %s\n" \
             "  author:  %s\n" \
             "%s\n",

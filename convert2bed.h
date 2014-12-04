@@ -563,6 +563,10 @@ typedef struct wig_state {
     char *basename;
 } c2b_wig_state_t;
 
+typedef struct cat_params {
+    char *path;
+} c2b_cat_params_t;
+
 typedef struct sort_params {
     boolean sort_flag;
     char *sort_bed_path;
@@ -582,7 +586,6 @@ static struct globals {
     c2b_format_t input_format_idx;
     char *output_format;
     c2b_format_t output_format_idx;
-    char *cat_path;
     unsigned int header_line_idx;
     boolean all_reads_flag;
     boolean keep_header_flag;
@@ -593,6 +596,7 @@ static struct globals {
     c2b_sam_state_t *sam_state;
     c2b_vcf_state_t *vcf_state;
     c2b_wig_state_t *wig_state;
+    c2b_cat_params_t *cat_params;
     c2b_sort_params_t *sort_params;
     c2b_starch_params_t *starch_params;
 } c2b_globals;
@@ -689,6 +693,8 @@ extern "C" {
     static void              c2b_delete_global_vcf_state();
     static void              c2b_init_global_wig_state();
     static void              c2b_delete_global_wig_state();
+    static void              c2b_init_global_cat_params();
+    static void              c2b_delete_global_cat_params();
     static void              c2b_init_global_sort_params();
     static void              c2b_delete_global_sort_params();
     static void              c2b_init_global_starch_params();
