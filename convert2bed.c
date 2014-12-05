@@ -152,7 +152,7 @@ c2b_init_generic_conversion(c2b_pipeset_t *p, void(*to_bed_line_functor)(char *,
     if ((!c2b_globals.sort->is_enabled) && (c2b_globals.output_format_idx == BED_FORMAT)) {
         cat2generic_stage.pipeset = p;
         cat2generic_stage.line_functor = NULL;
-        cat2generic_stage.src = -1; /* src is really stdin */
+        cat2generic_stage.src = -1;
         cat2generic_stage.dest = 0;
         cat2generic_stage.description = "Generic data from stdin";
         
@@ -165,13 +165,13 @@ c2b_init_generic_conversion(c2b_pipeset_t *p, void(*to_bed_line_functor)(char *,
         bed_unsorted2stdout_stage.pipeset = p;
         bed_unsorted2stdout_stage.line_functor = NULL;
         bed_unsorted2stdout_stage.src = 1;
-        bed_unsorted2stdout_stage.dest = -1; /* dest BED is stdout */
+        bed_unsorted2stdout_stage.dest = -1;
         bed_unsorted2stdout_stage.description = "Unsorted BED to stdout";
     }
     else if (c2b_globals.output_format_idx == BED_FORMAT) {
         cat2generic_stage.pipeset = p;
         cat2generic_stage.line_functor = NULL;
-        cat2generic_stage.src = -1; /* src is really stdin */
+        cat2generic_stage.src = -1;
         cat2generic_stage.dest = 0;
         cat2generic_stage.description = "Generic data from stdin"; 
         
@@ -190,13 +190,13 @@ c2b_init_generic_conversion(c2b_pipeset_t *p, void(*to_bed_line_functor)(char *,
         bed_sorted2stdout_stage.pipeset = p;
         bed_sorted2stdout_stage.line_functor = NULL;
         bed_sorted2stdout_stage.src = 2;
-        bed_sorted2stdout_stage.dest = -1; /* dest BED is stdout */
+        bed_sorted2stdout_stage.dest = -1;
         bed_sorted2stdout_stage.description = "Sorted BED to stdout";
     }
     else if (c2b_globals.output_format_idx == STARCH_FORMAT) {
         cat2generic_stage.pipeset = p;
         cat2generic_stage.line_functor = NULL;
-        cat2generic_stage.src = -1; /* src is really stdin */
+        cat2generic_stage.src = -1;
         cat2generic_stage.dest = 0;
         cat2generic_stage.description = "Generic data from stdin";
         
@@ -221,7 +221,7 @@ c2b_init_generic_conversion(c2b_pipeset_t *p, void(*to_bed_line_functor)(char *,
         starch2stdout_stage.pipeset = p;
         starch2stdout_stage.line_functor = NULL;
         starch2stdout_stage.src = 3;
-        starch2stdout_stage.dest = -1; /* dest Starch is stdout */
+        starch2stdout_stage.dest = -1;
         starch2stdout_stage.description = "Starch to stdout";
     }
     else {
@@ -410,7 +410,7 @@ c2b_init_bam_conversion(c2b_pipeset_t *p)
     if ((!c2b_globals.sort->is_enabled) && (c2b_globals.output_format_idx == BED_FORMAT)) {
         bam2sam_stage.pipeset = p;
         bam2sam_stage.line_functor = NULL;
-        bam2sam_stage.src = -1; /* src is really stdin */
+        bam2sam_stage.src = -1;
         bam2sam_stage.dest = 0;
         bam2sam_stage.description = "BAM data from stdin to SAM";
         
@@ -423,13 +423,13 @@ c2b_init_bam_conversion(c2b_pipeset_t *p)
         bed_unsorted2stdout_stage.pipeset = p;
         bed_unsorted2stdout_stage.line_functor = NULL;
         bed_unsorted2stdout_stage.src = 1;
-        bed_unsorted2stdout_stage.dest = -1; /* dest BED is stdout */
+        bed_unsorted2stdout_stage.dest = -1;
         bed_unsorted2stdout_stage.description = "Unsorted BED to stdout";
     }
     else if (c2b_globals.output_format_idx == BED_FORMAT) {
         bam2sam_stage.pipeset = p;
         bam2sam_stage.line_functor = NULL;
-        bam2sam_stage.src = -1; /* src is really stdin */
+        bam2sam_stage.src = -1;
         bam2sam_stage.dest = 0;
         bam2sam_stage.description = "BAM data from stdin to SAM";
         
@@ -448,13 +448,13 @@ c2b_init_bam_conversion(c2b_pipeset_t *p)
         bed_sorted2stdout_stage.pipeset = p;
         bed_sorted2stdout_stage.line_functor = NULL;
         bed_sorted2stdout_stage.src = 2;
-        bed_sorted2stdout_stage.dest = -1; /* dest BED is stdout */
+        bed_sorted2stdout_stage.dest = -1;
         bed_sorted2stdout_stage.description = "Sorted BED to stdout";
     }
     else if (c2b_globals.output_format_idx == STARCH_FORMAT) {
         bam2sam_stage.pipeset = p;
         bam2sam_stage.line_functor = NULL;
-        bam2sam_stage.src = -1; /* src is really stdin */
+        bam2sam_stage.src = -1;
         bam2sam_stage.dest = 0;
         bam2sam_stage.description = "BAM data from stdin to SAM";
         
@@ -479,7 +479,7 @@ c2b_init_bam_conversion(c2b_pipeset_t *p)
         starch2stdout_stage.pipeset = p;
         starch2stdout_stage.line_functor = NULL;
         starch2stdout_stage.src = 3;
-        starch2stdout_stage.dest = -1; /* dest Starch is stdout */
+        starch2stdout_stage.dest = -1;
         starch2stdout_stage.description = "Starch to stdout";
     }
     else {
