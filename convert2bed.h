@@ -27,6 +27,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/param.h>
+#include <sys/wait.h>
 
 #define C2B_VERSION "1.0"
 
@@ -434,6 +435,8 @@ typedef struct pipeline_stage {
     unsigned int src;
     unsigned int dest;
     void (*line_functor)();
+    int status;
+    char *description;
 } c2b_pipeline_stage_t;
 
 #define PIPE4_FLAG_NONE       (0U)
