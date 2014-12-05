@@ -166,7 +166,7 @@ c2b_init_generic_conversion(c2b_pipeset_t *p, void(*to_bed_line_functor)(char *,
         bed_unsorted2stdout_stage.line_functor = NULL;
         bed_unsorted2stdout_stage.src = 1;
         bed_unsorted2stdout_stage.dest = -1; /* dest BED is stdout */
-        bed_unsorted2stdout_stage.description = "Sorted BED to stdout";
+        bed_unsorted2stdout_stage.description = "Unsorted BED to stdout";
     }
     else if (c2b_globals.output_format_idx == BED_FORMAT) {
         cat2generic_stage.pipeset = p;
@@ -424,7 +424,7 @@ c2b_init_bam_conversion(c2b_pipeset_t *p)
         bed_unsorted2stdout_stage.line_functor = NULL;
         bed_unsorted2stdout_stage.src = 1;
         bed_unsorted2stdout_stage.dest = -1; /* dest BED is stdout */
-        bed_unsorted2stdout_stage.description = "Sorted BED to stdout";
+        bed_unsorted2stdout_stage.description = "Unsorted BED to stdout";
     }
     else if (c2b_globals.output_format_idx == BED_FORMAT) {
         bam2sam_stage.pipeset = p;
