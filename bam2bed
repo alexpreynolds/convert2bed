@@ -1,0 +1,104 @@
+#!/bin/bash
+
+#
+# convert2bed
+# Copyright (C) 2014 Alex Reynolds
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License along
+#    with this program; if not, write to the Free Software Foundation, Inc.,
+#    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+
+cmd="convert2bed"
+
+#
+# defaults
+#
+input_format="bam"
+output_format="bed"
+do_not_sort=false
+all_reads=false
+keep_header=false
+split=false
+
+help()
+{
+    ${cmd} --help-bam
+    exit $1
+}
+
+optspec=":skadh-:"
+while getopts "$optspec" optchar; do
+    case "${optchar}" in
+        -)
+            case "${OPTARG}" in
+                help)
+                    val="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
+                    #echo "Parsing option: '--${OPTARG}', value: '${val}'" >&2;
+                    help 0
+                    ;;
+                help=*)
+                    val=${OPTARG#*=}
+                    opt=${OPTARG%=$val}
+                    #echo "Parsing option: '--${opt}', value: '${val}'" >&2
+                    help 0
+                    ;;
+                help-bam)
+                    help 0
+                    ;;
+                do-not-sort)
+                    do_not_sort=true
+                    ;;
+                all-reads)
+                    all_reads=true
+                    ;;
+                keep-header)
+                    keep_header=true
+                    ;;
+                split)
+                    split=true
+                    ;;
+                *)
+                    help 1
+                    #if [ "$OPTERR" = 1 ] && [ "${optspec:0:1}" != ":" ]; then echo "Unknown option --${OPTARG}" >&2; fi
+                    ;;
+            esac;;
+        h)
+            help 0
+            ;;
+        d)
+            do_not_sort=true
+            ;;
+        a)
+            all_reads=true
+            ;;
+        k)
+            keep_header=true
+            ;;
+        s)
+            split=true
+            ;;
+        *)
+            help 1
+            #if [ "$OPTERR" != 1 ] || [ "${optspec:0:1}" = ":" ]; then echo "Non-option argument: '-${OPTARG}'" >&2; fi
+            ;;
+    esac
+done
+
+options="--input=${input_format} --output=${output_format}"
+if [ "${do_not_sort}" = true ]; then options="${options} --do-not-sort"; fi
+if [ "${all_reads}" = true ]; then options="${options} --all-reads"; fi
+if [ "${keep_header}" = true ]; then options="${options} --keep-header"; fi
+if [ "${split}" = true ]; then options="${options} --split"; fi
+
+${cmd} ${options} - <&0
