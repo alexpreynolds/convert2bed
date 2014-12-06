@@ -977,9 +977,9 @@ typedef struct sam_state {
 
 typedef struct vcf_state {
     boolean do_not_split;
-    boolean snvs;
-    boolean insertions;
-    boolean deletions;
+    boolean only_snvs;
+    boolean only_insertions;
+    boolean only_deletions;
     unsigned int filter_count;
 } c2b_vcf_state_t;
 

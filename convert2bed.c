@@ -2347,13 +2347,13 @@ c2b_line_convert_vcf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
         const char *allele_tok;
         while ((allele_tok = c2b_strsep(&alt_alleles_copy, ",")) != NULL) {
             vcf.alt = (char *) allele_tok; /* discard const */
-            if ((c2b_globals.vcf->filter_count == 1) && (!c2b_globals.vcf->insertions)) {
+            if ((c2b_globals.vcf->filter_count == 1) && (!c2b_globals.vcf->only_insertions)) {
                 vcf.end = start_val + abs(ref_size - strlen(vcf.alt)) + 1;
             }
             if ( (c2b_globals.vcf->filter_count == 0) ||
-                 ((c2b_globals.vcf->snvs) && (c2b_vcf_record_is_snv(ref_str, vcf.alt))) ||
-                 ((c2b_globals.vcf->insertions) && (c2b_vcf_record_is_insertion(ref_str, vcf.alt))) ||
-                 ((c2b_globals.vcf->deletions) && (c2b_vcf_record_is_deletion(ref_str, vcf.alt))) ) 
+                 ((c2b_globals.vcf->only_snvs) && (c2b_vcf_record_is_snv(ref_str, vcf.alt))) ||
+                 ((c2b_globals.vcf->only_insertions) && (c2b_vcf_record_is_insertion(ref_str, vcf.alt))) ||
+                 ((c2b_globals.vcf->only_deletions) && (c2b_vcf_record_is_deletion(ref_str, vcf.alt))) ) 
                 {
                     c2b_line_convert_vcf_to_bed(vcf, dest_line_str);
                     memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
@@ -2366,13 +2366,13 @@ c2b_line_convert_vcf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
 
         /* just print the one allele */
 
-        if ((c2b_globals.vcf->filter_count == 1) && (!c2b_globals.vcf->insertions)) {
+        if ((c2b_globals.vcf->filter_count == 1) && (!c2b_globals.vcf->only_insertions)) {
             vcf.end = start_val + abs(ref_size - strlen(alt_str)) + 1;
         }
         if ( (c2b_globals.vcf->filter_count == 0) ||
-             ((c2b_globals.vcf->snvs) && (c2b_vcf_record_is_snv(ref_str, alt_str))) ||
-             ((c2b_globals.vcf->insertions) && (c2b_vcf_record_is_insertion(ref_str, alt_str))) ||
-             ((c2b_globals.vcf->deletions) && (c2b_vcf_record_is_deletion(ref_str, alt_str))) ) 
+             ((c2b_globals.vcf->only_snvs) && (c2b_vcf_record_is_snv(ref_str, alt_str))) ||
+             ((c2b_globals.vcf->only_insertions) && (c2b_vcf_record_is_insertion(ref_str, alt_str))) ||
+             ((c2b_globals.vcf->only_deletions) && (c2b_vcf_record_is_deletion(ref_str, alt_str))) ) 
             {
                 c2b_line_convert_vcf_to_bed(vcf, dest_line_str);
                 memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
@@ -3869,9 +3869,9 @@ c2b_init_global_vcf_state()
     }
     
     c2b_globals.vcf->do_not_split = kFalse;
-    c2b_globals.vcf->snvs = kFalse;
-    c2b_globals.vcf->insertions = kFalse;
-    c2b_globals.vcf->deletions = kFalse;    
+    c2b_globals.vcf->only_snvs = kFalse;
+    c2b_globals.vcf->only_insertions = kFalse;
+    c2b_globals.vcf->only_deletions = kFalse;    
     c2b_globals.vcf->filter_count = 0U;
 
 #ifdef DEBUG
@@ -4177,15 +4177,15 @@ c2b_init_command_line_options(int argc, char **argv)
                 break;
             case 'v':
                 c2b_globals.vcf->filter_count++;
-                c2b_globals.vcf->snvs = kTrue;
+                c2b_globals.vcf->only_snvs = kTrue;
                 break;
             case 't':
                 c2b_globals.vcf->filter_count++;
-                c2b_globals.vcf->insertions = kTrue;
+                c2b_globals.vcf->only_insertions = kTrue;
                 break;
             case 'n':
                 c2b_globals.vcf->filter_count++;
-                c2b_globals.vcf->deletions = kTrue;
+                c2b_globals.vcf->only_deletions = kTrue;
                 break;
             case 'd':
                 c2b_globals.sort->is_enabled = kFalse;
@@ -4378,7 +4378,7 @@ c2b_print_format_usage(FILE *stream)
 
     if (format_options) {
         fprintf(stream,
-                "%s\n"        \
+                "%s\n"                          \
                 "  version: %s\n"               \
                 "  author:  %s\n\n"             \
                 "%s\n"                          \
@@ -4393,7 +4393,7 @@ c2b_print_format_usage(FILE *stream)
     }
     else {
         fprintf(stream,
-                "%s\n"        \
+                "%s\n"                          \
                 "  version: %s\n"               \
                 "  author:  %s\n\n"             \
                 "%s\n"                          \
