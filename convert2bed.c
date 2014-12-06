@@ -740,6 +740,7 @@ static inline void
 c2b_cmd_starch_bed(char *cmd) 
 {
     char starch_args[C2B_MAX_LINE_LENGTH_VALUE];
+    starch_args[0] = '\0';
 
     /* /path/to/starch [--bzip2 | --gzip] [--note="xyz..."] - */
     if (c2b_globals.starch->bzip2) {
@@ -749,7 +750,7 @@ c2b_cmd_starch_bed(char *cmd)
         starch_args[strlen(starch_bzip2_arg)] = '\0';
     }
     else if (c2b_globals.starch->gzip) {
-        memcpy(starch_args + strlen(starch_args),
+        memcpy(starch_args,
                starch_gzip_arg,
                strlen(starch_gzip_arg));
         starch_args[strlen(starch_gzip_arg)] = '\0';
@@ -4321,12 +4322,14 @@ c2b_print_usage(FILE *stream)
             "  author:  %s\n" \
             "%s\n"            \
             "%s\n"            \
+            "%s\n"            \
             "%s\n",
             general_name,
             version,
             authors,
             general_usage,
             general_description,
+            general_io_options, 
             general_options);
 
 #ifdef DEBUG
@@ -4403,13 +4406,15 @@ c2b_print_format_usage(FILE *stream)
                 "  author:  %s\n\n"             \
                 "%s\n"                          \
                 "%s\n"                          \
+                "%s\n"                          \
                 "%s\n",
                 format_name,
                 version,
                 authors,
                 format_usage,
                 format_description,
-                format_options);
+                format_options,
+                general_options);
     }
     else {
         fprintf(stream,
@@ -4417,12 +4422,14 @@ c2b_print_format_usage(FILE *stream)
                 "  version: %s\n"               \
                 "  author:  %s\n\n"             \
                 "%s\n"                          \
+                "%s\n"                          \
                 "%s\n",
                 format_name,
                 version,
                 authors,
                 format_usage,
-                format_description);
+                format_description,
+                general_options);
     }
 
 #ifdef DEBUG

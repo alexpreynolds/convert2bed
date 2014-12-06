@@ -491,13 +491,16 @@ static const char *general_description =                                \
     "\n"                                                                \
     "  $ upstream_process ... | convert2bed --input=fmt - > output\n";
 
-static const char *general_options =                                    \
-    "  Required process flags:\n\n"                                     \
+static const char *general_io_options =                                 \
+    "  Input (required):\n\n"                                           \
     "  --input=[bam|gff|gtf|psl|sam|vcf|wig] (-i <fmt>)\n"              \
     "      Genomic format of input file (required)\n\n"                 \
-    "  Other processing options:\n\n"                                   \
+    "  Output:\n\n"                                                     \
     "  --output=[bed|starch] (-o <fmt>)\n"                              \
-    "      Format of output file, either BED or BEDOPS Starch (optional, default is BED)\n" \
+    "      Format of output file, either BED or BEDOPS Starch (optional, default is BED)\n";
+
+static const char *general_options =                                    \
+    "  Other processing options:\n\n"                                   \
     "  --do-not-sort (-d)\n"                                            \
     "      Do not sort BED output with sort-bed (not compatible with --output=starch)\n" \
     "  --max-mem=<value> (-m <val>)\n"                                  \
@@ -565,8 +568,7 @@ static const char *bam_description =                                    \
     "  pseudo-BED elements that use the \"_header\" chromosome name.\n";
 
 static const char *bam_options =                                        \
-    "  BAM conversion options\n"                                        \
-    "  -------------------------------------------------------------\n" \
+    "  BAM conversion options:\n\n"                                     \
     "  --all-reads (-a)\n"                                              \
     "      Include both unmapped and mapped reads in output\n"          \
     "  --keep-header (-k)\n"                                            \
@@ -629,8 +631,7 @@ static const char *gff_description =                                    \
     "  chromosome name.\n";
 
 static const char *gff_options =                                        \
-    "  GFF conversion options\n"                                        \
-    "  -------------------------------------------------------------\n" \
+    "  GFF conversion options:\n\n"                                     \
     "  --keep-header (-k)\n"                                            \
     "      Preserve header section as pseudo-BED elements\n";
 
@@ -777,8 +778,7 @@ static const char *psl_description =                                    \
     "  - tStarts\n";
 
 static const char *psl_options =                                        \
-    "  PSL conversion options\n"                                        \
-    "  -------------------------------------------------------------\n" \
+    "  PSL conversion options:\n\n"                                     \
     "  --keep-header (-k)\n"                                            \
     "      Preserve header section as pseudo-BED elements (requires --headered)\n" \
     "  --split (-s)\n"                                                  \
@@ -851,8 +851,7 @@ static const char *sam_description =                                    \
     "  pseudo-BED elements.\n";
 
 static const char *sam_options =                                        \
-    "  SAM conversion options\n"                                        \
-    "  -------------------------------------------------------------\n" \
+    "  SAM conversion options:\n\n"                                     \
     "  --all-reads (-a)\n"                                              \
     "      Include both unmapped and mapped reads in output\n"          \
     "  --keep-header (-k)\n"                                            \
@@ -920,8 +919,7 @@ static const char *vcf_description =                                    \
     "     before conversion.\n";
 
 static const char *vcf_options =                                        \
-    "  VCF conversion options\n"                                        \
-    "  -------------------------------------------------------------\n" \
+    "  VCF conversion options:\n\n"                                     \
     "  --do-not-split (-d)\n"                                           \
     "      By default, this application prints multiple BED elements for each alternate\n" \
     "      allele. Use this flag to print one BED element for all alternate alleles\n" \
@@ -967,8 +965,7 @@ static const char *wig_description =                                    \
     "  output ready for use with other BEDOPS utilities.\n";
 
 static const char *wig_options =                                        \
-    "  WIG conversion options\n"                                        \
-    "  -------------------------------------------------------------\n" \
+    "  WIG conversion options:\n\n"                                     \
     "  --multisplit=<basename> (-b <basename>)\n"                       \
     "      A single input file may have multiple WIG sections. With this option\n" \
     "      every section gets an ID prefix starting with <basename>.1, then\n" \
