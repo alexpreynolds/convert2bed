@@ -695,6 +695,7 @@ static inline void
 c2b_cmd_sort_bed(char *cmd)
 {
     char sort_bed_args[C2B_MAX_LINE_LENGTH_VALUE];
+    sort_bed_args[0] = '\0';
 
     /* /path/to/sort-bed [--max-mem <val>] [--tmpdir <path>] - */
     if (c2b_globals.sort->max_mem_value) {
