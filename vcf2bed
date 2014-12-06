@@ -20,7 +20,7 @@
 #
 
 cmd="convert2bed"
-input_format="gff"
+input_format="vcf"
 output_format="bed"
 
 # general
@@ -33,15 +33,19 @@ sort_tmpdir="/tmp"
 
 # format-specific
 
+do_not_split=false
+snvs=false
+insertions=false
+deletions=false
 keep_header=false
 
 help()
 {
-    ${cmd} --help-gff
+    ${cmd} --help-vcf
     exit $1
 }
 
-optspec=":r:m:dhk-:"
+optspec=":r:m:dhpvtnk-:"
 while getopts "$optspec" optchar; do
     case "${optchar}" in
         -)
@@ -80,8 +84,20 @@ while getopts "$optspec" optchar; do
                 do-not-sort)
                     do_not_sort=true
                     ;;
-                help-gff)
+                help-vcf)
                     help 0
+                    ;;
+                do-not-split)
+                    do_not_split=true
+                    ;;
+                snvs)
+                    snvs=true
+                    ;;
+                insertions)
+                    insertions=true
+                    ;;
+                deletions)
+                    deletions=true
                     ;;
                 keep-header)
                     keep_header=true
@@ -105,6 +121,18 @@ while getopts "$optspec" optchar; do
         h)
             help 0
             ;;
+        p)
+            do_not_split=true
+            ;;
+        v)
+            snvs=true
+            ;;
+        t)
+            insertions=true
+            ;;
+        n)
+            deletions=true
+            ;;
         k)
             keep_header=true
             ;;
@@ -127,6 +155,10 @@ if [ "${do_not_sort}" = true ]; then options="${options} --do-not-sort"; fi
 
 # format-specific
 
+if [ "${do_not_split}" = true ]; then options="${options} --do-not-split"; fi
+if [ "${snvs}" = true ]; then options="${options} --snvs"; fi
+if [ "${insertions}" = true ]; then options="${options} --insertions"; fi
+if [ "${deletions}" = true ]; then options="${options} --deletions"; fi
 if [ "${keep_header}" = true ]; then options="${options} --keep-header"; fi
 
 ${cmd} ${options} - <&0

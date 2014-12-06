@@ -39,7 +39,7 @@ help()
     exit $1
 }
 
-optspec=":r:m:skadh-:"
+optspec=":r:m:dh-:"
 while getopts "$optspec" optchar; do
     case "${optchar}" in
         -)

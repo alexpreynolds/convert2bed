@@ -920,7 +920,7 @@ static const char *vcf_description =                                    \
 
 static const char *vcf_options =                                        \
     "  VCF conversion options:\n\n"                                     \
-    "  --do-not-split (-d)\n"                                           \
+    "  --do-not-split (-p)\n"                                           \
     "      By default, this application prints multiple BED elements for each alternate\n" \
     "      allele. Use this flag to print one BED element for all alternate alleles\n" \
     "  --snvs (-v)\n"                                                   \

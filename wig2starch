@@ -20,8 +20,8 @@
 #
 
 cmd="convert2bed"
-input_format="gff"
-output_format="bed"
+input_format="wig"
+output_format="starch"
 
 # general
 
@@ -30,22 +30,32 @@ max_mem_set=false
 max_mem="2G"
 sort_tmpdir_set=false
 sort_tmpdir="/tmp"
+starch_bzip2=false
+starch_gzip=false
+starch_note=""
+starch_not_set=false
 
 # format-specific
-
-keep_header=false
+multisplit=""
+multisplit_set=false
 
 help()
 {
-    ${cmd} --help-gff
+    ${cmd} --help-wig
     exit $1
 }
 
-optspec=":r:m:dhk-:"
+optspec=":e:zgr:m:dhb:-:"
 while getopts "$optspec" optchar; do
     case "${optchar}" in
         -)
             case "${OPTARG}" in
+                starch-bzip2)
+                    starch_bzip2=true
+                    ;;
+                starch-gzip)
+                    starch_gzip=true
+                    ;;
                 sort-tmpdir)
                     val="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
                     sort_tmpdir=${val}
@@ -56,6 +66,16 @@ while getopts "$optspec" optchar; do
                     sort_tmpdir=${val}
                     sort_tmpdir_set=true
                     ;;
+                starch-note)
+                    val="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
+                    starch_note="\"${val}\""
+                    starch_note_set=true
+                    ;;
+                starch-note=*)
+                    val=${OPTARG#*=}
+                    starch_note="\"${val}\""
+                    starch_note_set=true
+                    ;;
                 max-mem)
                     val="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
                     max_mem=${val}
@@ -65,6 +85,9 @@ while getopts "$optspec" optchar; do
                     val=${OPTARG#*=}
                     max_mem=${val}
                     max_mem_set=true
+                    ;;
+                do-not-sort)
+                    do_not_sort=true
                     ;;
                 help)
                     val="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
@@ -77,20 +100,34 @@ while getopts "$optspec" optchar; do
                     #echo "Parsing option: '--${opt}', value: '${val}'" >&2
                     help 0
                     ;;
-                do-not-sort)
-                    do_not_sort=true
-                    ;;
-                help-gff)
+                help-wig)
                     help 0
                     ;;
-                keep-header)
-                    keep_header=true
+                multisplit)
+                    val="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
+                    multisplit=${val}
+                    multisplit_set=true
+                    ;;
+                multisplit=*)
+                    val=${OPTARG#*=}
+                    multisplit=${val}
+                    multisplit_set=true
                     ;;
                 *)
                     help 1
                     #if [ "$OPTERR" = 1 ] && [ "${optspec:0:1}" != ":" ]; then echo "Unknown option --${OPTARG}" >&2; fi
                     ;;
             esac;;
+        e)
+            starch_note="\"${OPTARG}\""
+            starch_note_set=true
+            ;;
+        z)
+            starch_bzip2=true
+            ;;
+        g)
+            starch_gzip=true
+            ;;
         r)
             sort_tmpdir=${OPTARG}
             sort_tmpdir_set=true
@@ -105,8 +142,9 @@ while getopts "$optspec" optchar; do
         h)
             help 0
             ;;
-        k)
-            keep_header=true
+        b)
+            multisplit=${OPTARG}
+            multisplit_set=true
             ;;
         *)
             help 1
@@ -122,11 +160,14 @@ options="--input=${input_format} --output=${output_format}"
 # general
 
 if [ "${max_mem_set}" = true ]; then options="${options} --max-mem=${max_mem}"; fi
-if [ "${sort_tmpdir_set}" = true ]; then options="${options} --sort-tmpdir=${sort_tmpdir}"; fi
+if [ "${sort_tmpdir_set}" = true ]; then options="${options} --sort-tmpdir=\"${sort_tmpdir}\""; fi
 if [ "${do_not_sort}" = true ]; then options="${options} --do-not-sort"; fi
+if [ "${starch_gzip}" = false ]; then starch_bzip2=true; else options="${options} --starch-gzip"; fi
+if [ "${starch_bzip2}" = true ]; then options="${options} --starch-bzip2"; fi
+if [ "${starch_note_set}" = true ]; then options="${options} --starch-note=\"${starch_note}\""; fi
 
 # format-specific
 
-if [ "${keep_header}" = true ]; then options="${options} --keep-header"; fi
+if [ "${multisplit_set}" = true ]; then options="${options} --multisplit=\"${multisplit}\""; fi
 
-${cmd} ${options} - <&0
+echo ${cmd} ${options} - <&0

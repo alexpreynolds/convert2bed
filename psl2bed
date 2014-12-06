@@ -42,7 +42,7 @@ help()
     exit $1
 }
 
-optspec=":r:m:skadh-:"
+optspec=":r:m:dhks-:"
 while getopts "$optspec" optchar; do
     case "${optchar}" in
         -)
