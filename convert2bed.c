@@ -4192,6 +4192,34 @@ c2b_init_command_line_options(int argc, char **argv)
             case 'h':
                 c2b_print_usage(stdout);
                 exit(EXIT_SUCCESS);
+            case '1':
+                c2b_globals.help_format_idx = BAM_FORMAT;
+                c2b_print_format_usage(stdout);
+                exit(EXIT_SUCCESS);
+            case '2':
+                c2b_globals.help_format_idx = GFF_FORMAT;
+                c2b_print_format_usage(stdout);
+                exit(EXIT_SUCCESS);
+            case '3':
+                c2b_globals.help_format_idx = GTF_FORMAT;
+                c2b_print_format_usage(stdout);
+                exit(EXIT_SUCCESS);
+            case '4':
+                c2b_globals.help_format_idx = PSL_FORMAT;
+                c2b_print_format_usage(stdout);
+                exit(EXIT_SUCCESS);
+            case '5':
+                c2b_globals.help_format_idx = SAM_FORMAT;
+                c2b_print_format_usage(stdout);
+                exit(EXIT_SUCCESS);
+            case '6':
+                c2b_globals.help_format_idx = VCF_FORMAT;
+                c2b_print_format_usage(stdout);
+                exit(EXIT_SUCCESS);
+            case '7':
+                c2b_globals.help_format_idx = WIG_FORMAT;
+                c2b_print_format_usage(stdout);
+                exit(EXIT_SUCCESS);
             case '?':
                 c2b_print_usage(stderr);
                 exit(EXIT_SUCCESS);
@@ -4258,14 +4286,114 @@ c2b_print_usage(FILE *stream)
             "%s\n"            \
             "  version: %s\n" \
             "  author:  %s\n" \
+            "%s\n"            \
+            "%s\n"            \
             "%s\n",
-            name,
+            general_name,
             version,
             authors,
-            usage);
+            general_usage,
+            general_description,
+            general_options);
 
 #ifdef DEBUG
     fprintf(stderr, "--- c2b_print_usage() - exit  ---\n");
+#endif
+}
+
+static void
+c2b_print_format_usage(FILE *stream)
+{
+#ifdef DEBUG
+    fprintf(stderr, "--- c2b_print_format_usage() - enter ---\n");
+#endif
+
+    char *format_name = NULL;
+    char *format_description = NULL;
+    char *format_options = NULL;
+    char *format_usage = NULL;
+
+    switch(c2b_globals.help_format_idx) {
+    case BAM_FORMAT:
+        format_name = (char *) bam_name;
+        format_usage = (char *) bam_usage;
+        format_description = (char *) bam_description;
+        format_options = (char *) bam_options;
+        break;
+    case GFF_FORMAT:
+        format_name = (char *) gff_name;
+        format_usage = (char *) gff_usage;
+        format_description = (char *) gff_description;
+        format_options = (char *) gff_options;
+        break;
+    case GTF_FORMAT:
+        format_name = (char *) gtf_name;
+        format_usage = (char *) gtf_usage;
+        format_description = (char *) gtf_description;
+        format_options = (char *) gtf_options;
+        break;
+    case PSL_FORMAT:
+        format_name = (char *) psl_name;
+        format_usage = (char *) psl_usage;
+        format_description = (char *) psl_description;
+        format_options = (char *) psl_options;
+        break;
+    case SAM_FORMAT:
+        format_name = (char *) sam_name;
+        format_usage = (char *) sam_usage;
+        format_description = (char *) sam_description;
+        format_options = (char *) sam_options;
+        break;
+    case VCF_FORMAT:
+        format_name = (char *) vcf_name;
+        format_usage = (char *) vcf_usage;
+        format_description = (char *) vcf_description;
+        format_options = (char *) vcf_options;
+        break;
+    case WIG_FORMAT:
+        format_name = (char *) wig_name;
+        format_usage = (char *) wig_usage;
+        format_description = (char *) wig_description;
+        format_options = (char *) wig_options;
+        break;
+    default:
+        format_name = (char *) general_name;
+        format_usage = (char *) format_undefined_usage;
+        format_description = (char *) general_description;
+        format_options = (char *) general_options;
+    }
+
+    if (format_options) {
+        fprintf(stream,
+                "%s\n"        \
+                "  version: %s\n"               \
+                "  author:  %s\n\n"             \
+                "%s\n"                          \
+                "%s\n"                          \
+                "%s\n",
+                format_name,
+                version,
+                authors,
+                format_usage,
+                format_description,
+                format_options);
+    }
+    else {
+        fprintf(stream,
+                "%s\n"        \
+                "  version: %s\n"               \
+                "  author:  %s\n\n"             \
+                "%s\n"                          \
+                "%s\n",
+                format_name,
+                version,
+                authors,
+                format_usage,
+                format_description);
+    }
+
+#ifdef DEBUG
+    fprintf(stderr, "--- c2b_print_format_usage() - exit  ---\n");
 #endif
 }
 

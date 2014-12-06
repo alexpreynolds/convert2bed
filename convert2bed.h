@@ -381,12 +381,12 @@ typedef struct vcf {
 
 /* 
    At most, we need 4 pipes to handle the most complex conversion
-   pipeline within the BEDOPS suite: 
+   pipeline used with the BEDOPS suite: 
    
     BAM -> SAM -> BED (unsorted) -> BED (sorted) -> Starch
    
-   Here, each arrow represents a unidirectional path between
-   processing steps. 
+   Here, each arrow represents a unidirectional path of data 
+   between processing steps. 
    
    The other two possibilities are:
      
@@ -402,11 +402,11 @@ typedef struct vcf {
 
    Here, XYZ is one of GFF, GTF, PSL, SAM, VCF, or WIG.
    
-   If a more complex pipeline arises, we can just increase the value
-   of MAX_PIPES.
+   If a more complex pipeline ever arises, we could just increase the
+   value of MAX_PIPES.
 
    Each pipe has a read and write stream. The write stream handles
-   data sent via the out and err file handles. We bundles all the pipes
+   data sent via the out and err file handles. We bundle all the pipes
    into a "pipeset" for use at a processing stage, described below.
 */
 
@@ -453,77 +453,510 @@ typedef struct pipeline_stage {
 #define POPEN4_FLAG_CLOSE_CHILD_STDOUT          (1U << 4)
 #define POPEN4_FLAG_CLOSE_CHILD_STDERR          (1U << 5)
 
-static const char *name = "convert2bed";
+static const char *general_name = "convert2bed";
+
 static const char *version = C2B_VERSION;
+
 static const char *authors = "Alex Reynolds";
-static const char *usage = "\n" \
-    "Usage: convert2bed --input=fmt [--output=fmt] [options] < input > output\n" \
-    "\n" \
-    "  Convert common binary and text genomic formats to BED or BEDOPS Starch (compressed BED)\n\n" \
-    "  Input can be a regular file or standard input piped in using the hyphen character ('-')\n\n" \
-    "  Required process flags:\n\n" \
-    "  --input=[bam|gff|gtf|psl|sam|vcf|wig] | -i [bam|gff|gtf|psl|sam|vcf|wig]\n" \
-    "      Genomic format of input file (required)\n\n" \
-    "  Format-specific options:\n\n" \
-    "  BAM/SAM\n" \
-    "  -----------------------------------------------------------------------\n" \
-    "  --all-reads | -a\n" \
-    "      Include both unmapped and mapped reads in output\n" \
-    "  --keep-header | -k\n" \
-    "      Preserve header section as pseudo-BED elements\n" \
-    "  --split | -s\n" \
-    "      Split reads with 'N' CIGAR operations into separate BED elements\n\n" \
-    "  GFF\n" \
-    "  -----------------------------------------------------------------------\n" \
-    "  --keep-header | -k\n" \
-    "      Preserve header section as pseudo-BED elements\n\n" \
-    "  PSL\n" \
-    "  -----------------------------------------------------------------------\n" \
-    "  --keep-header | -k\n" \
-    "      Preserve header section as pseudo-BED elements (requires --headered)\n" \
-    "  --split | -s\n" \
-    "      Split record into multiple BED elements, based on tStarts field value\n\n" \
-    "  VCF\n" \
-    "  -----------------------------------------------------------------------\n" \
-    "  --do-not-split | -p\n" \
-    "      By default, this application prints multiple BED elements for each alternate\n" \
-    "      allele. Use this flag to print one BED element for all alternate alleles\n" \
-    "  --snvs | -v\n" \
-    "      Report only single nucleotide variants\n" \
-    "  --insertions | -t\n" \
-    "      Report only insertion variants\n" \
-    "  --deletions | -n\n" \
-    "      Report only deletion variants\n" \
-    "  --keep-header | -k\n" \
-    "      Preserve header section as pseudo-BED elements\n\n" \
-    "  WIG\n" \
-    "  -----------------------------------------------------------------------\n" \
-    "  --multisplit=[basename] | -b [basename]\n" \
-    "      A single input file may have multiple WIG sections. With this option\n" \
-    "      every section gets an ID prefix starting with [basename].1, then\n" \
-    "      [basename].2, and so on\n\n" \
-    "  Other processing options:\n\n" \
-    "  --output=[bed|starch] | -o [bed|starch]\n" \
-    "      Format of output file (optional, default is BED)\n" \
-    "  --do-not-sort | -d\n" \
+
+static const char *general_usage = "\n"                                 \
+    "  Usage:\n"                                                        \
+    "\n"                                                                \
+    "  $ convert2bed --input=fmt [--output=fmt] [options] < input > output\n";
+
+static const char *general_description =                                \
+    "  Convert BAM, GFF, GTF, PSL, SAM, VCF and WIG genomic formats to BED or BEDOPS Starch (compressed BED)\n" \
+    "\n"                                                                \
+    "  Input can be a regular file or standard input piped in using the hyphen character ('-'):\n" \
+    "\n"                                                                \
+    "  $ upstream_process ... | convert2bed --input=fmt - > output\n";
+
+static const char *general_options =                                    \
+    "  Required process flags:\n\n"                                     \
+    "  --input=[bam|gff|gtf|psl|sam|vcf|wig] (-i <fmt>)\n"              \
+    "      Genomic format of input file (required)\n\n"                 \
+    "  Other processing options:\n\n"                                   \
+    "  --output=[bed|starch] (-o <fmt>)\n"                              \
+    "      Format of output file, either BED or BEDOPS Starch (optional, default is BED)\n" \
+    "  --do-not-sort (-d)\n"                                            \
     "      Do not sort BED output with sort-bed (not compatible with --output=starch)\n" \
-    "  --max-mem=[value] | -m [value]\n" \
-    "      Sets aside [value] memory for sorting BED output. For example, [value] can\n" \
-    "      be 8G, 8000M or 8000000000 to specify 8 GB of memory (default is 2G)\n"
-    "  --sort-tmpdir=[dir] | -r [dir]\n" \
+    "  --max-mem=<value> (-m <val>)\n"                                  \
+    "      Sets aside <value> memory for sorting BED output. For example, <value> can\n" \
+    "      be 8G, 8000M or 8000000000 to specify 8 GB of memory (default is 2G)\n" \
+    "  --sort-tmpdir=<dir> (-r <dir>)\n"                                \
     "      Optionally sets [dir] as temporary directory for sort data, when used in\n" \
     "      conjunction with --max-mem=[value], instead of the host's operating system\n" \
-    "      default temporary directory\n" \
-    "  --starch-bzip2 | -z\n" \
+    "      default temporary directory\n"                               \
+    "  --starch-bzip2 (-z)\n"                                           \
     "      Used with --output=starch, the compressed output explicitly applies the bzip2\n" \
     "      algorithm to compress intermediate data (default is bzip2)\n" \
-    "  --starch-gzip | -g\n" \
+    "  --starch-gzip (-g)\n"                                            \
     "      Used with --output=starch, the compressed output applies gzip compression on\n" \
-    "      intermediate data\n" \
-    "  --starch-note=\"xyz...\" | -e\n" \
+    "      intermediate data\n"                                         \
+    "  --starch-note=\"xyz...\" (-e \"xyz...\")\n"                      \
     "      Used with --output=starch, this adds a note to the Starch archive metadata\n" \
-    "  --help | -h\n" \
-    "      Show help message\n";
+    "  --help | --help[-bam|-gff|-gtf|-psl|-sam|-vcf|-wig] (-h | -h <fmt>)\n" \
+    "      Show general help message (or detailed help for a specified input format)\n";
+
+static const char *bam_name = "convert2bed -i bam";
+
+static const char *bam_description =                                    \
+    "  The BAM format is an indexed, binary representation of a SAM (Sequence\n" \
+    "  Alignment/Map) file. Internally, it is a 0-based, half-open [a-1,b)\n" \
+    "  file, but printing it to text via samtools turns it into a SAM file, which\n" \
+    "  is 1-based, closed [a,b]. We convert this indexing back to 0-based, half-\n" \
+    "  open when creating BED output.\n"                                \
+    "\n"                                                                \
+    "  We process SAM columns from mappable reads (as described by \n"  \
+    "  http://samtools.github.io/hts-specs/SAMv1.pdf) converting them into the first\n" \
+    "  six UCSC BED columns as follows:\n"                              \
+    "\n"                                                                \
+    "  - RNAME                     <-->   chromosome (1st column)\n"    \
+    "  - POS - 1                   <-->   start (2nd column)\n"         \
+    "  - POS + length(CIGAR) - 1   <-->   stop (3rd column)\n"          \
+    "  - QNAME                     <-->   id (4th column)\n"            \
+    "  - FLAG                      <-->   score (5th column)\n"         \
+    "  - 16 & FLAG                 <-->   strand (6th column)\n"        \
+    "\n"                                                                \
+    "  The remaining SAM columns are mapped intact, in order, to adjacent BED\n" \
+    "  columns:\n"                                                      \
+    "\n"                                                                \
+    "  - MAPQ\n"                                                        \
+    "  - CIGAR\n"                                                       \
+    "  - RNEXT\n"                                                       \
+    "  - PNEXT\n"                                                       \
+    "  - TLEN\n"                                                        \
+    "  - SEQ\n"                                                         \
+    "  - QUAL\n"                                                        \
+    "\n"                                                                \
+    "  Because we have mapped all columns, we can translate converted BED data back\n" \
+    "  to headerless SAM reads with a simple awk statement or other script that\n" \
+    "  calculates 1-based coordinates and permutes columns.\n"          \
+    "\n"                                                                \
+    "  By default, we only process mapped reads. If you also want to convert unmapped\n" \
+    "  reads, add the --all-reads option.\n"                            \
+    "\n"                                                                \
+    "  In the case of RNA-seq data with skipped regions ('N' components in the\n" \
+    "  read's CIGAR string), the --split option will split the read into two or more\n" \
+    "  separate BED elements.\n"                                        \
+    "\n"                                                                \
+    "  The header section is normally stripped from the output. You can use the\n" \
+    "  --keep-header option to preserve the header data from the SAM input as\n" \
+    "  pseudo-BED elements that use the \"_header\" chromosome name.\n";
+
+static const char *bam_options =                                        \
+    "  BAM conversion options\n"                                        \
+    "  -------------------------------------------------------------\n" \
+    "  --all-reads (-a)\n"                                              \
+    "      Include both unmapped and mapped reads in output\n"          \
+    "  --keep-header (-k)\n"                                            \
+    "      Preserve header section as pseudo-BED elements\n"            \
+    "  --split (-s)\n"                                                  \
+    "      Split reads with 'N' CIGAR operations into separate BED\n"   \
+    "      elements\n";
+
+static const char *bam_usage =                                          \
+    "  Converts 0-based, half-open [a-1,b) headered or headerless BAM input\n" \
+    "  into 0-based, half-open [a-1,b) extended BED or BEDOPS Starch\n\n" \
+    "  Usage:\n"                                                        \
+    "\n"                                                                \
+    "  $ bam2bed < foo.bam > sorted-foo.bam.bed\n"                      \
+    "  $ bam2starch < foo.bam > sorted-foo.bam.starch\n"                \
+    "\n"                                                                \
+    "  Or:\n"                                                           \
+    "\n"                                                                \
+    "  $ convert2bed -i bam < foo.bam > sorted-foo.bam.bed\n"           \
+    "  $ convert2bed -i bam -o starch < foo.bam > sorted-foo.bam.starch\n" \
+    "\n"                                                                \
+    "  We make no assumptions about sort order from converted output. Apply\n" \
+    "  the usage case displayed to pass data to the BEDOPS sort-bed application,\n" \
+    "  which generates lexicographically-sorted BED data as output.\n"  \
+    "\n"                                                                \
+    "  If you want to skip sorting, use the --do-not-sort option:\n"    \
+    "\n"                                                                \
+    "  $ bam2bed --do-not-sort < foo.bam > unsorted-foo.bam.bed\n";
+
+static const char *gff_name = "convert2bed -i gff";
+
+static const char *gff_description =                                    \
+    "  The GFF3 specification (http://www.sequenceontology.org/gff3.shtml) \n" \
+    "  contains columns that do not map directly to common or UCSC BED columns.\n" \
+    "  Therefore, we add the following columns to preserve the ability to\n" \
+    "  seamlessly convert back to GFF3 after performing operations with\n" \
+    "  bedops, bedmap, or other BEDOPS or BED-processing tools.\n"      \
+    "\n"                                                                \
+    "  - The 'source' GFF column data maps to the 7th BED column\n"     \
+    "  - The 'type' data maps to the 8th BED column\n"                  \
+    "  - The 'phase' data maps to the 9th BED column\n"                 \
+    "  - The 'attributes' data maps to the 10th BED column\n"           \
+    "\n"                                                                \
+    "  We make the following assumptions about the GFF3 input data:\n"  \
+    "\n"                                                                \
+    "  - The 'seqid' GFF column data maps to the chromosome label (1st BED column)\n" \
+    "  - The 'ID' attribute in the 'attributes' GFF column (if present) maps to\n" \
+    "    the element ID (4th BED column)\n"                             \
+    "  - The 'score' and 'strand' GFF columns (if present) are mapped to the\n" \
+    "    5th and 6th BED columns, respectively\n"                       \
+    "\n"                                                                \
+    "  If we encounter zero-length insertion elements (which are defined\n" \
+    "  where the start and stop GFF column data values are equivalent), the\n" \
+    "  start coordinate is decremented to convert to 0-based, half-open indexing,\n" \
+    "  and a 'zero_length_insertion' attribute is added to the 'attributes' GFF\n" \
+    "  column data.\n"                                                  \
+    "\n"                                                                \
+    "  Metadata and header fields are usually stripped. Use the --keep-header\n" \
+    "  option to preserve these data as pseudo-BED elements that use the \"_header\"\n" \
+    "  chromosome name.\n";
+
+static const char *gff_options =                                        \
+    "  GFF conversion options\n"                                        \
+    "  -------------------------------------------------------------\n" \
+    "  --keep-header (-k)\n"                                            \
+    "      Preserve header section as pseudo-BED elements\n";
+
+static const char *gff_usage =                                          \
+    "  Converts 1-based, closed [a, b] GFF3 input into 0-based, half-\n" \
+    "  open [a-1, b) six-column extended BED or BEDOPS Starch\n"        \
+    "\n"                                                                \
+    "  Usage:\n"                                                        \
+    "\n"                                                                \
+    "  $ gff2bed < foo.gff > sorted-foo.gff.bed\n"                      \
+    "  $ gff2starch < foo.gff > sorted-foo.gff.starch\n"                \
+    "\n"                                                                \
+    "  Or:\n"                                                           \
+    "\n"                                                                \
+    "  $ convert2bed -i gff < foo.gff > sorted-foo.gff.bed\n"           \
+    "  $ convert2bed -i gff -o starch < foo.gff > sorted-foo.gff.starch\n" \
+    "\n"                                                                \
+    "  We make no assumptions about sort order from converted output. Apply\n" \
+    "  the usage case displayed to pass data to the sort-bed application,\n" \
+    "  which generates lexicographically-sorted BED data as output.\n"  \
+    "\n"                                                                \
+    "  If you want to skip sorting, use the --do-not-sort option:\n"    \
+    "\n"                                                                \
+    "  $ gff2bed --do-not-sort < foo.gff > unsorted-foo.gff.bed\n";
+
+static const char *gtf_name = "convert2bed -i gtf";
+
+static const char *gtf_usage =                                          \
+    "  Converts 1-based, closed [a, b] GTF2.2 input into 0-based, half-\n" \
+    "  open [a-1, b) six-column extended BED and BEDOPS Starch\n"       \
+    "\n"                                                                \
+    "  Usage:\n"                                                        \
+    "\n"                                                                \
+    "  $ gtf2bed < foo.gtf > sorted-foo.gtf.bed\n"                      \
+    "  $ gtf2starch < foo.gtf > sorted-foo.gtf.starch\n"                \
+    "\n"                                                                \
+    "  Or:\n"                                                           \
+    "\n"                                                                \
+    "  $ convert2bed -i gtf < foo.gtf > sorted-foo.gtf.bed\n"           \
+    "  $ convert2bed -i gtf -o starch < foo.gtf > sorted-foo.gtf.starch\n" \
+    "\n"                                                                \
+    "  We make no assumptions about sort order from converted output. Apply\n" \
+    "  the usage case displayed to pass data to the sort-bed application,\n" \
+    "  which generates lexicographically-sorted BED data as output.\n"  \
+    "\n"                                                                \
+    "  If you want to skip sorting, use the --do-not-sort option:\n"    \
+    "\n"                                                                \
+    "  $ gtf2bed --do-not-sort < foo.gtf > unsorted-foo.gtf.bed\n";
+
+static const char *gtf_description =                                    \
+    "  The GTF2.2 specification (http://mblab.wustl.edu/GTF22.html)\n"  \
+    "  contains columns that do not map directly to common or UCSC BED columns.\n" \
+    "  Therefore, we add the following columns to preserve the ability to\n" \
+    "  seamlessly convert back to GTF after performing operations with\n" \
+    "  BEDOPS or other tools.\n"                                        \
+    "\n"                                                                \
+    "  - The 'source' GTF column data maps to the 7th BED column\n"     \
+    "  - The 'feature' data maps to the 8th BED column\n"               \
+    "  - The 'frame' data maps to the 9th BED column\n"                 \
+    "  - The 'attributes' data maps to the 10th BED column\n"           \
+    "  - The 'comments' data (if present) maps to the 11th BED column\n" \
+    "\n"                                                                \
+    "  We make the following assumptions about the GTF input data:\n"   \
+    "\n"                                                                \
+    "  - The 'seqname' GTF column data maps to the chromosome label (1st BED column)\n" \
+    "  - The 'gene_id' attribute in the 'attributes' GTF column (if present) maps to \n" \
+    "    the element ID (4th BED column)\n"                             \
+    "  - The 'score' and 'strand' GFF columns (if present) are mapped to the\n" \
+    "    5th and 6th BED columns, respectively\n"                       \
+    "\n"                                                                \
+    "  If we encounter zero-length insertion elements (which are defined\n" \
+    "  where the start and stop GTF column data values are equivalent), the \n" \
+    "  start coordinate is decremented to convert to 0-based, half-open indexing,\n" \
+    "  and a 'zero_length_insertion' attribute is added to the 'attributes' GTF\n" \
+    "  column data.\n";
+
+static const char *gtf_options = NULL;
+
+static const char *psl_name = "convert2bed -i psl";
+
+static const char *psl_usage =                                          \
+    "  Converts 0-based, half-open [a-1, b) headered or headerless PSL\n" \
+    "  input into 0-based, half-open [a-1, b) extended BED or BEDOPS Starch\n" \
+    "\n"                                                                \
+    "  $ psl2bed < foo.psl > sorted-foo.psl.bed\n"                      \
+    "  $ psl2starch < foo.psl > sorted-foo.psl.starch\n"                \
+    "\n"                                                                \
+    "  Or:\n"                                                           \
+    "\n"                                                                \
+    "  $ convert2bed -i psl < foo.psl > sorted-foo.psl.bed\n"           \
+    "  $ convert2bed -i psl -o starch < foo.psl > sorted-foo.psl.starch\n" \
+    "\n"                                                                \
+    "  We make no assumptions about sort order from converted output. Apply\n" \
+    "  the usage case displayed to pass data to the BEDOPS sort-bed application\n" \
+    "  which generates lexicographically-sorted BED data as output.\n"  \
+    "\n"                                                                \
+    "  If you want to skip sorting, use the --do-not-sort option:\n"    \
+    "\n"                                                                \
+    "  $ psl2bed --do-not-sort < foo.psl > unsorted-foo.psl.bed\n";
+
+static const char *psl_description =                                    \
+    "  The PSL specification (http://genome.ucsc.edu/goldenPath/help/blatSpec.html)\n" \
+    "  contains 21 columns, some which map to UCSC BED columns and some which do not.\n" \
+    "\n"                                                                \
+    "  PSL input can contain a header or be headerless, if the BLAT search was\n" \
+    "  performed with the -noHead option. This program can accept input in\n" \
+    "  either format.\n"                                                \
+    "\n"                                                                \
+    "  If input is headered, you can use the --keep-header option to preserve the header\n" \
+    "  data as pseudo-BED elements that use the \"_header\" chromosome name. We expect this\n" \
+    "  should not cause any collision problems since PSL data should use UCSC chromosome\n" \
+    "  naming conventions.\n"                                           \
+    "\n"                                                                \
+    "  We describe below how we map columns to BED, so that BLAT results can be losslessly\n" \
+    "  transformed back into PSL format with a simple awk statement or other similar\n" \
+    "  command that permutes columns into PSL-ordering.\n"              \
+    "\n"                                                                \
+    "  We map the following PSL columns to their equivalent BED column, as follows:\n" \
+    "\n"                                                                \
+    "  - tName    <-->   chromosome\n"                                  \
+    "  - tStart   <-->   start\n"                                       \
+    "  - tEnd     <-->   stop\n"                                        \
+    "  - qName    <-->   id\n"                                          \
+    "  - qSize    <-->   score\n"                                       \
+    "  - strand   <-->   strand\n"                                      \
+    "\n"                                                                \
+    "  Remaining PSL columns are mapped, in order, to columns 7 through 21 in the\n" \
+    "  BED output:\n"                                                   \
+    "\n"                                                                \
+    "  - matches\n"                                                     \
+    "  - misMatches\n"                                                  \
+    "  - repMatches\n"                                                  \
+    "  - nCount\n"                                                      \
+    "  - qNumInsert\n"                                                  \
+    "  - qBaseInsert\n"                                                 \
+    "  - tNumInsert\n"                                                  \
+    "  - tBaseInsert\n"                                                 \
+    "  - qStart\n"                                                      \
+    "  - qEnd\n"                                                        \
+    "  - tSize\n"                                                       \
+    "  - blockCount\n"                                                  \
+    "  - blockSizes\n"                                                  \
+    "  - qStarts\n"                                                     \
+    "  - tStarts\n";
+
+static const char *psl_options =                                        \
+    "  PSL conversion options\n"                                        \
+    "  -------------------------------------------------------------\n" \
+    "  --keep-header (-k)\n"                                            \
+    "      Preserve header section as pseudo-BED elements (requires --headered)\n" \
+    "  --split (-s)\n"                                                  \
+    "      Split record into multiple BED elements, based on tStarts field value\n";
+
+static const char *sam_name = "convert2bed -i sam";
+
+static const char *sam_usage =                                          \
+    "  Converts 1-based, closed [a, b] headered or headerless SAM input\n" \
+    "  into 0-based, half-open [a-1, b) extended BED or BEDOPS Starch\n" \
+    "\n"                                                                \
+    "  Usage:\n"                                                        \
+    "\n"                                                                \
+    "  $ sam2bed < foo.sam > sorted-foo.sam.bed\n"                      \
+    "  $ sam2starch < foo.sam > sorted-foo.sam.starch\n"                \
+    "\n"                                                                \
+    "  Or:\n"                                                           \
+    "\n"                                                                \
+    "  $ convert2bed -i sam < foo.sam > sorted-foo.sam.bed\n"           \
+    "  $ convert2bed -i sam -o starch < foo.sam > sorted-foo.sam.starch\n" \
+    "\n"                                                                \
+    "  We make no assumptions about sort order from converted output. Apply\n" \
+    "  the usage case displayed to pass data to the BEDOPS sort-bed application,\n" \
+    "  which generates lexicographically-sorted BED data as output.\n"  \
+    "\n"                                                                \
+    "  If you want to skip sorting, use the --do-not-sort option:\n"    \
+    "\n"                                                                \
+    "  $ sam2bed --do-not-sort < foo.sam > unsorted-foo.sam.bed\n";
+
+static const char *sam_description =                                    \
+    "  The SAM (Sequence Alignment/Map) format is 1-based and closed [a, b]\n" \
+    "  which is converted to 0-based, half-closed [a-1, b) when creating\n" \
+    "  BED output.\n"                                                   \
+    "\n"                                                                \
+    "  We process SAM columns from mappable reads (as described by \n"  \
+    "  http://samtools.github.io/hts-specs/SAMv1.pdf) converting them into \n" \
+    "  the first six UCSC BED columns, as follows:\n"                   \
+    "\n"                                                                \
+    "  - RNAME                     <-->   chromosome (1st column)\n"    \
+    "  - POS - 1                   <-->   start (2nd column)\n"         \
+    "  - POS + length(CIGAR) - 1   <-->   stop (3rd column)\n"          \
+    "  - QNAME                     <-->   id (4th column)\n"            \
+    "  - FLAG                      <-->   score (5th column)\n"         \
+    "  - 16 & FLAG                 <-->   strand (6th column)\n"        \
+    "\n"                                                                \
+    "  The remaining SAM columns are mapped intact, in order, to adjacent\n" \
+    "  BED columns:\n"                                                  \
+    "\n"                                                                \
+    "  - MAPQ\n"                                                        \
+    "  - CIGAR\n"                                                       \
+    "  - RNEXT\n"                                                       \
+    "  - PNEXT\n"                                                       \
+    "  - TLEN\n"                                                        \
+    "  - SEQ\n"                                                         \
+    "  - QUAL\n"                                                        \
+    "\n"                                                                \
+    "  Because we have mapped all columns, we can translate converted BED data back\n" \
+    "  to headerless SAM reads with a simple awk statement or other script that\n" \
+    "  calculates 1-based coordinates and permutes columns.\n"          \
+    "\n"                                                                \
+    "  By default, we only process mapped reads. If you also want to convert unmapped\n" \
+    "  reads, add the --all-reads option.\n"                            \
+    "\n"                                                                \
+    "  In the case of RNA-seq data with skipped regions ('N' components in the\n" \
+    "  read's CIGAR string), the --split option will split the read into two or more\n" \
+    "  separate BED elements.\n"                                        \
+    "\n"                                                                \
+    "  The header section is normally stripped from the output. You can use the\n" \
+    "  --keep-header option to preserve the header data from the SAM input as\n" \
+    "  pseudo-BED elements.\n";
+
+static const char *sam_options =                                        \
+    "  SAM conversion options\n"                                        \
+    "  -------------------------------------------------------------\n" \
+    "  --all-reads (-a)\n"                                              \
+    "      Include both unmapped and mapped reads in output\n"          \
+    "  --keep-header (-k)\n"                                            \
+    "      Preserve header section as pseudo-BED elements\n"            \
+    "  --split (-s)\n"                                                  \
+    "      Split reads with 'N' CIGAR operations into separate BED\n"   \
+    "      elements\n";
+
+static const char *vcf_name = "convert2bed -i vcf";
+
+static const char *vcf_usage =                                          \
+    "  Converts 1-based, closed [a, b] VCF v4 input into 0-based,\n"    \
+    "  half-open [a-1, b) extended BED or BEDOPS Starch\n"              \
+    "\n"                                                                \
+    "  Usage:\n"                                                        \
+    "\n"                                                                \
+    "  $ vcf2bed < foo.vcf > sorted-foo.vcf.bed\n"                      \
+    "  $ vcf2starch < foo.vcf > sorted-foo.vcf.starch\n"                \
+    "\n"                                                                \
+    "  Or:\n"                                                           \
+    "\n"                                                                \
+    "  $ convert2bed -i vcf < foo.vcf > sorted-foo.vcf.bed\n"           \
+    "  $ convert2bed -i vcf -o starch < foo.vcf > sorted-foo.vcf.starch\n" \
+    "\n"                                                                \
+    "  We make no assumptions about sort order from converted output. Apply\n" \
+    "  the usage case displayed to pass data to the BEDOPS sort-bed application,\n" \
+    "  which generates lexicographically-sorted BED data as output.\n"  \
+    "\n"                                                                \
+    "  If you want to skip sorting, use the --do-not-sort option:\n"    \
+    "\n"                                                                \
+    "  $ vcf2bed --do-not-sort < foo.vcf > unsorted-foo.vcf.bed\n";
+
+static const char *vcf_description =                                    \
+    "  This conversion utility relies on the VCF v4.2 format, with its\n" \
+    "  specifications outlined here by the 1000 Genomes and Samtools projects:\n" \
+    "\n"                                                                \
+    "  http://samtools.github.io/hts-specs/VCFv4.2.pdf\n"               \
+    "\n"                                                                \
+    "  -- The \"meta-information\" (starting with '##') and \"header\"\n" \
+    "     lines (starting with '#') are discarded, unless the --keep-header\n" \
+    "     option is used.\n\n"                                          \
+    "     To preserve metadata and header as BED elements, use the \n"  \
+    "     --keep-header option, which munges these data into pseudo-elements\n" \
+    "     that generally sort to the top (when chromosomes follow UCSC naming\n" \
+    "     conventions) by using the \"_header\" chromosome name.\n"     \
+    "\n"                                                                \
+    "  -- The header line must be tab-delimited. The eight, fixed mandatory\n" \
+    "     columns are converted to BED data as follows:\n"              \
+    "\n"                                                                \
+    "     - Data in the #CHROM column are mapped to the first column of\n" \
+    "       the BED output\n"                                           \
+    "     - The POS column is mapped to the second and third BED columns\n" \
+    "     - The ID and QUAL columns are mapped to the fourth and fifth BED\n" \
+    "       columns, respectively\n"                                    \
+    "     - The REF, ALT, FILTER and INFO are mapped to the sixth through\n" \
+    "       ninth BED columns, respectively\n"                          \
+    "\n"                                                                \
+    "  -- If present, genotype data in FORMAT and subsequence sample IDs\n" \
+    "     are placed into tenth and subsequent columns.\n"              \
+    "\n"                                                                \
+    "  -- Data rows must also be tab-delimited.\n"                      \
+    "\n"                                                                \
+    "  -- Any missing data or non-standard delimiters may cause\n"      \
+    "     problems. It may be useful to validate the VCF v4.2 input\n"  \
+    "     before conversion.\n";
+
+static const char *vcf_options =                                        \
+    "  VCF conversion options\n"                                        \
+    "  -------------------------------------------------------------\n" \
+    "  --do-not-split (-d)\n"                                           \
+    "      By default, this application prints multiple BED elements for each alternate\n" \
+    "      allele. Use this flag to print one BED element for all alternate alleles\n" \
+    "  --snvs (-v)\n"                                                   \
+    "      Report only single nucleotide variants\n"                    \
+    "  --insertions (-t)\n"                                             \
+    "      Report only insertion variants\n"                            \
+    "  --deletions (-n)\n"                                              \
+    "      Report only deletion variants\n"                             \
+    "  --keep-header (-k)\n"                                            \
+    "      Preserve header section as pseudo-BED elements\n";
+
+static const char *wig_name = "convert2bed -i wig";
+
+static const char *wig_usage =                                          \
+    "  Convert UCSC Wiggle to extended BED or BEDOPS Starch\n"          \
+    "\n"                                                                \
+    "  Usage:\n"                                                        \
+    "\n"                                                                \
+    "  $ wig2bed < foo.wig > sorted-foo.wig.bed\n"                      \
+    "  $ wig2starch < foo.wig > sorted-foo.wig.starch\n"                \
+    "\n"                                                                \
+    "  Or:\n"                                                           \
+    "\n"                                                                \
+    "  $ convert2bed -i wig < foo.wig > sorted-foo.wig.bed\n"           \
+    "  $ convert2bed -i wig -o starch < foo.wig > sorted-foo.wig.starch\n" \
+    "\n"                                                                \
+    "  We make no assumptions about sort order from converted output. Apply\n" \
+    "  the usage case displayed to pass data to the BEDOPS sort-bed application,\n" \
+    "  which generates lexicographically-sorted BED data as output.\n"  \
+    "\n"                                                                \
+    "  If you want to skip sorting, use the --do-not-sort option:\n"    \
+    "\n"                                                                \
+    "  $ wig2bed --do-not-sort < foo.wig > unsorted-foo.wig.bed\n";
+
+static const char *wig_description =                                    \
+    "  The UCSC Wiggle format (http://genome.ucsc.edu/goldenPath/help/wiggle.html)\n" \
+    "  is 1-based, closed [a, b] and is offered in variable or fixed step varieties.\n" \
+    "  We convert either variety to 0-based, half-open [a-1, b) indexing when creating\n" \
+    "  BED output.\n"                                                   \
+    "\n"                                                                \
+    "  By default, data are passed internally to BEDOPS sort-bed to provide sorted\n" \
+    "  output ready for use with other BEDOPS utilities.\n";
+
+static const char *wig_options =                                        \
+    "  WIG conversion options\n"                                        \
+    "  -------------------------------------------------------------\n" \
+    "  --multisplit=<basename> (-b <basename>)\n"                       \
+    "      A single input file may have multiple WIG sections. With this option\n" \
+    "      every section gets an ID prefix starting with <basename>.1, then\n" \
+    "      <basename>.2, and so on\n";
+
+static const char *format_undefined_usage =                             \
+    "  Note: Please specify format to get detailed usage parameters:\n\n" \
+    "  --help[-bam|-gff|-gtf|-psl|-sam|-vcf|-wig] (-h <fmt>)\n";
 
 typedef struct gff_state {
     char *id;
@@ -585,6 +1018,7 @@ typedef struct starch_params {
 } c2b_starch_params_t;
 
 static struct globals {
+    c2b_format_t help_format_idx;
     char *input_format;
     c2b_format_t input_format_idx;
     char *output_format;
@@ -620,12 +1054,19 @@ static struct option c2b_client_long_options[] = {
     { "starch-note",    required_argument,   NULL,    'e' },
     { "max-mem",        required_argument,   NULL,    'm' },
     { "sort-tmpdir",    required_argument,   NULL,    'r' },
-    { "basename",       required_argument,   NULL,    'b' },
+    { "multisplit",     required_argument,   NULL,    'b' },
     { "help",           no_argument,         NULL,    'h' },
+    { "help-bam",       no_argument,         NULL,    '1' },
+    { "help-gff",       no_argument,         NULL,    '2' },
+    { "help-gtf",       no_argument,         NULL,    '3' },
+    { "help-psl",       no_argument,         NULL,    '4' },
+    { "help-sam",       no_argument,         NULL,    '5' },
+    { "help-vcf",       no_argument,         NULL,    '6' },
+    { "help-wig",       no_argument,         NULL,    '7' },
     { NULL,             no_argument,         NULL,     0  }
 };
 
-static const char *c2b_client_opt_string = "i:o:dakspvtnzge:m:r:b:h?";
+static const char *c2b_client_opt_string = "i:o:dakspvtnzge:m:r:b:h1234567?";
 
 #ifdef __cplusplus
 extern "C" {
@@ -704,6 +1145,7 @@ extern "C" {
     static void              c2b_delete_global_starch_params();
     static void              c2b_init_command_line_options(int argc, char **argv);
     static void              c2b_print_usage(FILE *stream);
+    static void              c2b_print_format_usage(FILE *stream);
     static char *            c2b_to_lowercase(const char *src);
     static c2b_format_t      c2b_to_input_format(const char *input_format);
     static c2b_format_t      c2b_to_output_format(const char *output_format);
