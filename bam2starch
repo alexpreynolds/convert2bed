@@ -88,6 +88,9 @@ while getopts "$optspec" optchar; do
                     max_mem=${val}
                     max_mem_set=true
                     ;;
+                do-not-sort)
+                    do_not_sort=true
+                    ;;
                 help)
                     val="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
                     #echo "Parsing option: '--${OPTARG}', value: '${val}'" >&2;
@@ -101,9 +104,6 @@ while getopts "$optspec" optchar; do
                     ;;
                 help-bam)
                     help 0
-                    ;;
-                do-not-sort)
-                    do_not_sort=true
                     ;;
                 all-reads)
                     all_reads=true
@@ -137,11 +137,11 @@ while getopts "$optspec" optchar; do
             max_mem=${OPTARG}
             max_mem_set=true
             ;;
-        h)
-            help 0
-            ;;
         d)
             do_not_sort=true
+            ;;
+        h)
+            help 0
             ;;
         a)
             all_reads=true
@@ -167,12 +167,12 @@ options="--input=${input_format} --output=${output_format}"
 
 if [ "${max_mem_set}" = true ]; then options="${options} --max-mem=${max_mem}"; fi
 if [ "${sort_tmpdir_set}" = true ]; then options="${options} --sort-tmpdir=${sort_tmpdir}"; fi
+if [ "${do_not_sort}" = true ]; then options="${options} --do-not-sort"; fi
 if [ "${starch_gzip}" = false ]; then starch_bzip2=true; else options="${options} --starch-gzip"; fi
 if [ "${starch_bzip2}" = true ]; then options="${options} --starch-bzip2"; fi
 
 # format-specific
 
-if [ "${do_not_sort}" = true ]; then options="${options} --do-not-sort"; fi
 if [ "${all_reads}" = true ]; then options="${options} --all-reads"; fi
 if [ "${keep_header}" = true ]; then options="${options} --keep-header"; fi
 if [ "${split}" = true ]; then options="${options} --split"; fi

@@ -20,8 +20,8 @@
 #
 
 cmd="convert2bed"
-input_format="sam"
-output_format="starch"
+input_format="gff"
+output_format="bed"
 
 # general
 
@@ -30,34 +30,22 @@ max_mem_set=false
 max_mem="2G"
 sort_tmpdir_set=false
 sort_tmpdir="/tmp"
-starch_bzip2=false
-starch_gzip=false
-starch_note=""
-starch_not_set=false
 
 # format-specific
 
-all_reads=false
 keep_header=false
-split=false
 
 help()
 {
-    ${cmd} --help-sam
+    ${cmd} --help-gff
     exit $1
 }
 
-optspec=":e:zgr:m:skadh-:"
+optspec=":r:m:skadh-:"
 while getopts "$optspec" optchar; do
     case "${optchar}" in
         -)
             case "${OPTARG}" in
-                starch-bzip2)
-                    starch_bzip2=true
-                    ;;
-                starch-gzip)
-                    starch_gzip=true
-                    ;;
                 sort-tmpdir)
                     val="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
                     sort_tmpdir=${val}
@@ -68,16 +56,6 @@ while getopts "$optspec" optchar; do
                     sort_tmpdir=${val}
                     sort_tmpdir_set=true
                     ;;
-                starch-note)
-                    val="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
-                    starch_note="\"${val}\""
-                    starch_note_set=true
-                    ;;
-                starch-note=*)
-                    val=${OPTARG#*=}
-                    starch_note="\"${val}\""
-                    starch_note_set=true
-                    ;;
                 max-mem)
                     val="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
                     max_mem=${val}
@@ -87,9 +65,6 @@ while getopts "$optspec" optchar; do
                     val=${OPTARG#*=}
                     max_mem=${val}
                     max_mem_set=true
-                    ;;
-                do-not-sort)
-                    do_not_sort=true
                     ;;
                 help)
                     val="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
@@ -102,33 +77,20 @@ while getopts "$optspec" optchar; do
                     #echo "Parsing option: '--${opt}', value: '${val}'" >&2
                     help 0
                     ;;
-                help-sam)
-                    help 0
+                do-not-sort)
+                    do_not_sort=true
                     ;;
-                all-reads)
-                    all_reads=true
+                help-gff)
+                    help 0
                     ;;
                 keep-header)
                     keep_header=true
-                    ;;
-                split)
-                    split=true
                     ;;
                 *)
                     help 1
                     #if [ "$OPTERR" = 1 ] && [ "${optspec:0:1}" != ":" ]; then echo "Unknown option --${OPTARG}" >&2; fi
                     ;;
             esac;;
-        e)
-            starch_note="\"${OPTARG}\""
-            starch_note_set=true
-            ;;
-        z)
-            starch_bzip2=true
-            ;;
-        g)
-            starch_gzip=true
-            ;;
         r)
             sort_tmpdir=${OPTARG}
             sort_tmpdir_set=true
@@ -143,14 +105,8 @@ while getopts "$optspec" optchar; do
         h)
             help 0
             ;;
-        a)
-            all_reads=true
-            ;;
         k)
             keep_header=true
-            ;;
-        s)
-            split=true
             ;;
         *)
             help 1
@@ -168,13 +124,9 @@ options="--input=${input_format} --output=${output_format}"
 if [ "${max_mem_set}" = true ]; then options="${options} --max-mem=${max_mem}"; fi
 if [ "${sort_tmpdir_set}" = true ]; then options="${options} --sort-tmpdir=${sort_tmpdir}"; fi
 if [ "${do_not_sort}" = true ]; then options="${options} --do-not-sort"; fi
-if [ "${starch_gzip}" = false ]; then starch_bzip2=true; else options="${options} --starch-gzip"; fi
-if [ "${starch_bzip2}" = true ]; then options="${options} --starch-bzip2"; fi
 
 # format-specific
 
-if [ "${all_reads}" = true ]; then options="${options} --all-reads"; fi
 if [ "${keep_header}" = true ]; then options="${options} --keep-header"; fi
-if [ "${split}" = true ]; then options="${options} --split"; fi
 
-echo ${cmd} ${options} - <&0
+${cmd} ${options} - <&0
