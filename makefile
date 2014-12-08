@@ -4,6 +4,7 @@ CDFLAGS                   = -D__STDC_CONSTANT_MACROS -D_FILE_OFFSET_BITS=64 -D_L
 LIBS                      = -lpthread
 INCLUDES                 := -iquote"${PWD}"
 OBJDIR                    = objects
+WRAPPERDIR                = wrappers
 PROG                      = convert2bed
 SOURCE                    = convert2bed.c
 
@@ -21,6 +22,10 @@ build: setup
 debug: setup
 	$(CC) $(BLDFLAGS) $(CDFLAGS) -c $(SOURCE) -o $(OBJDIR)/$(PROG).o $(INCLUDES)
 	$(CC) $(BLDFLAGS) $(CDFLAGS) $(OBJDIR)/$(PROG).o -o $(PROG) $(LIBS)
+
+install:
+	cp -f $(PROG) /usr/local/bin
+	cp -f $(WRAPPERDIR)/* /usr/local/bin
 
 clean:
 	rm -f $(PROG)
