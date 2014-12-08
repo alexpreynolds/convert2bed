@@ -32,3 +32,8 @@ Wrappers are available for each of the supported formats to convert to BED or St
     $ bam2starch < reads.bam > reads.starch
 
 Format-specific options are available for each wrapper; use `--help` with a wrapper script or `--help-bam`, `--help-gff` etc. with `convert2bed` to get a format-specific description of the conversion procedure and options.
+
+Notes
+-----
+
+This tool is dependent upon [`samtools`](https://github.com/samtools/samtools) to handle BAM conversion, and BEDOPS [`sort-bed`](http://bedops.readthedocs.org/en/latest/content/reference/file-management/sorting/sort-bed.html) and [`starch`](http://bedops.readthedocs.org/en/latest/content/reference/file-management/compression/starch.html) to generate sorted BED and Starch (compressed BED) output. 
