@@ -1,0 +1,82 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>convert2bed by alexpreynolds</title>
+
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1>convert2bed</h1>
+        <p>Convert common binary and text genomic formats to BED</p>
+
+        <p class="view"><a href="https://github.com/alexpreynolds/convert2bed">View the Project on GitHub <small>alexpreynolds/convert2bed</small></a></p>
+
+
+        <ul>
+          <li><a href="https://github.com/alexpreynolds/convert2bed/zipball/master">Download <strong>ZIP File</strong></a></li>
+          <li><a href="https://github.com/alexpreynolds/convert2bed/tarball/master">Download <strong>TAR Ball</strong></a></li>
+          <li><a href="https://github.com/alexpreynolds/convert2bed">View On <strong>GitHub</strong></a></li>
+        </ul>
+      </header>
+      <section>
+        <h1>
+<a id="convert2bed" class="anchor" href="#convert2bed" aria-hidden="true"><span class="octicon octicon-link"></span></a>convert2bed</h1>
+
+<p>The <code>convert2bed</code> tool converts common binary and text genomic formats (<a href="http://samtools.github.io/hts-specs/SAMv1.pdf">BAM</a>, <a href="http://www.sequenceontology.org/gff3.shtml">GFF</a>, <a href="http://mblab.wustl.edu/GTF22.html">GTF</a>, <a href="http://genome.ucsc.edu/FAQ/FAQformat.html#format2">PSL</a>, <a href="http://samtools.github.io/hts-specs/SAMv1.pdf">SAM</a>, <a href="http://samtools.github.io/hts-specs/VCFv4.2.pdf">VCF</a> and <a href="http://genome.ucsc.edu/goldenpath/help/wiggle.html">WIG</a>) to unsorted or <a href="http://bedops.readthedocs.org/en/latest/content/reference/file-management/sorting/sort-bed.html">sorted, extended BED</a> or <a href="http://bedops.readthedocs.org/en/latest/content/reference/file-management/compression/starch.html">BEDOPS Starch</a> (compressed BED) with additional per-format options. </p>
+
+<p>Convenience wrapper <code>bash</code> scripts are provided for each format that convert standard input to unsorted or sorted BED, or to BEDOPS Starch (compressed BED). Scripts expose format-specific <code>convert2bed</code> options.</p>
+
+<h2>
+<a id="installation" class="anchor" href="#installation" aria-hidden="true"><span class="octicon octicon-link"></span></a>Installation</h2>
+
+<p>The following compiles <code>convert2bed</code> and copies the binary and wrappers to <code>/usr/local/bin</code>:</p>
+
+<pre><code>$ make &amp;&amp; make install
+</code></pre>
+
+<h2>
+<a id="usage" class="anchor" href="#usage" aria-hidden="true"><span class="octicon octicon-link"></span></a>Usage</h2>
+
+<p>Generally, to convert data in format <code>xyz</code> to sorted BED:</p>
+
+<pre><code>$ convert2bed -i xyz &lt; input.xyz &gt; output.bed
+</code></pre>
+
+<p>Add the <code>-o starch</code> option to write a BEDOPS Starch file, which stores compressed BED data and feature metadata:</p>
+
+<pre><code>$ convert2bed -i xyz -o starch &lt; input.xyz &gt; output.starch
+</code></pre>
+
+<p>Wrappers are available for each of the supported formats to convert to BED or Starch, <em>e.g.</em>:</p>
+
+<pre><code>$ bam2bed &lt; reads.bam &gt; reads.bed
+$ bam2starch &lt; reads.bam &gt; reads.starch
+</code></pre>
+
+<p>Format-specific options are available for each wrapper; use <code>--help</code> with a wrapper script or <code>--help-bam</code>, <code>--help-gff</code> etc. with <code>convert2bed</code> to get a format-specific description of the conversion procedure and options.</p>
+
+<h2>
+<a id="dependencies" class="anchor" href="#dependencies" aria-hidden="true"><span class="octicon octicon-link"></span></a>Dependencies</h2>
+
+<p>This tool is dependent upon <a href="https://github.com/samtools/samtools"><code>samtools</code></a> to handle BAM conversion, and BEDOPS <a href="http://bedops.readthedocs.org/en/latest/content/reference/file-management/sorting/sort-bed.html"><code>sort-bed</code></a> and <a href="http://bedops.readthedocs.org/en/latest/content/reference/file-management/compression/starch.html"><code>starch</code></a> to generate sorted BED and Starch (compressed BED) output. The directory containing these binaries should be present in the end user's <code>PATH</code> environment variable. </p>
+
+<p>If the <code>samtools</code> binary is not present, BAM conversion will fail. If the <code>sort-bed</code> binary is not installed, all format conversions will fail with default sort rules applied. If the <code>starch</code> binary is not installed, the <code>starch</code> output format option will be unavailable.</p>
+      </section>
+      <footer>
+        <p>This project is maintained by <a href="https://github.com/alexpreynolds">alexpreynolds</a></p>
+        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
+      </footer>
+    </div>
+    <script src="javascripts/scale.fix.js"></script>
+    
+  </body>
+</html>
