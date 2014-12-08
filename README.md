@@ -33,7 +33,9 @@ Wrappers are available for each of the supported formats to convert to BED or St
 
 Format-specific options are available for each wrapper; use `--help` with a wrapper script or `--help-bam`, `--help-gff` etc. with `convert2bed` to get a format-specific description of the conversion procedure and options.
 
-Notes
------
+Dependencies
+------------
 
-This tool is dependent upon [`samtools`](https://github.com/samtools/samtools) to handle BAM conversion, and BEDOPS [`sort-bed`](http://bedops.readthedocs.org/en/latest/content/reference/file-management/sorting/sort-bed.html) and [`starch`](http://bedops.readthedocs.org/en/latest/content/reference/file-management/compression/starch.html) to generate sorted BED and Starch (compressed BED) output. The directory containing these binaries should be present in the end user's `PATH` environment variable. If the `samtools` binary is not present, BAM conversion will fail. If the `sort-bed` binary is not installed, all format conversions will fail with default sort rules applied. If the `starch` binary is not installed, the `starch` output format option will be unavailable.
+This tool is dependent upon [`samtools`](https://github.com/samtools/samtools) to handle BAM conversion, and BEDOPS [`sort-bed`](http://bedops.readthedocs.org/en/latest/content/reference/file-management/sorting/sort-bed.html) and [`starch`](http://bedops.readthedocs.org/en/latest/content/reference/file-management/compression/starch.html) to generate sorted BED and Starch (compressed BED) output. The directory containing these binaries should be present in the end user's `PATH` environment variable. 
+
+If the `samtools` binary is not present, BAM conversion will fail. If the `sort-bed` binary is not installed, all format conversions will fail with default sort rules applied. If the `starch` binary is not installed, the `starch` output format option will be unavailable.
