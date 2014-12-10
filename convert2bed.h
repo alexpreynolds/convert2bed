@@ -459,6 +459,7 @@ typedef struct pipeline_stage {
     void (*line_functor)();
     int status;
     char *description;
+    pid_t pid;
 } c2b_pipeline_stage_t;
 
 #define PIPE4_FLAG_NONE       (0U)

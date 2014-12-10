@@ -157,9 +157,6 @@ c2b_init_generic_conversion(c2b_pipeset_t *p, void(*to_bed_line_functor)(char *,
     pthread_t bed_sorted2stdout_thread;
     pthread_t bed_sorted2starch_thread;
     pthread_t starch2stdout_thread;
-    pid_t cat2generic_proc;
-    pid_t bed_unsorted2bed_sorted_proc;
-    pid_t bed_sorted2starch_proc;
     c2b_pipeline_stage_t cat2generic_stage;
     c2b_pipeline_stage_t generic2bed_unsorted_stage;
     c2b_pipeline_stage_t bed_unsorted2stdout_stage;
@@ -179,18 +176,21 @@ c2b_init_generic_conversion(c2b_pipeset_t *p, void(*to_bed_line_functor)(char *,
         cat2generic_stage.src = -1;
         cat2generic_stage.dest = 0;
         cat2generic_stage.description = "Generic data from stdin";
+        cat2generic_stage.pid = 0;
         
         generic2bed_unsorted_stage.pipeset = p;
         generic2bed_unsorted_stage.line_functor = generic2bed_unsorted_line_functor;
         generic2bed_unsorted_stage.src = 0;
         generic2bed_unsorted_stage.dest = 1;
         generic2bed_unsorted_stage.description = "Generic data to unsorted BED";
+        generic2bed_unsorted_stage.pid = 0;
 
         bed_unsorted2stdout_stage.pipeset = p;
         bed_unsorted2stdout_stage.line_functor = NULL;
         bed_unsorted2stdout_stage.src = 1;
         bed_unsorted2stdout_stage.dest = -1;
         bed_unsorted2stdout_stage.description = "Unsorted BED to stdout";
+        bed_unsorted2stdout_stage.pid = 0;
     }
     else if (c2b_globals.output_format_idx == BED_FORMAT) {
         cat2generic_stage.pipeset = p;
@@ -198,24 +198,28 @@ c2b_init_generic_conversion(c2b_pipeset_t *p, void(*to_bed_line_functor)(char *,
         cat2generic_stage.src = -1;
         cat2generic_stage.dest = 0;
         cat2generic_stage.description = "Generic data from stdin"; 
+        cat2generic_stage.pid = 0;
         
         generic2bed_unsorted_stage.pipeset = p;
         generic2bed_unsorted_stage.line_functor = generic2bed_unsorted_line_functor;
         generic2bed_unsorted_stage.src = 0;
         generic2bed_unsorted_stage.dest = 1;
         generic2bed_unsorted_stage.description = "Generic data to unsorted BED";
+        generic2bed_unsorted_stage.pid = 0;
         
         bed_unsorted2bed_sorted_stage.pipeset = p;
         bed_unsorted2bed_sorted_stage.line_functor = NULL;
         bed_unsorted2bed_sorted_stage.src = 1;
         bed_unsorted2bed_sorted_stage.dest = 2;
         bed_unsorted2bed_sorted_stage.description = "Unsorted BED to sorted BED";
+        bed_unsorted2bed_sorted_stage.pid = 0;
 
         bed_sorted2stdout_stage.pipeset = p;
         bed_sorted2stdout_stage.line_functor = NULL;
         bed_sorted2stdout_stage.src = 2;
         bed_sorted2stdout_stage.dest = -1;
         bed_sorted2stdout_stage.description = "Sorted BED to stdout";
+        bed_sorted2stdout_stage.pid = 0;
     }
     else if (c2b_globals.output_format_idx == STARCH_FORMAT) {
         cat2generic_stage.pipeset = p;
@@ -223,30 +227,35 @@ c2b_init_generic_conversion(c2b_pipeset_t *p, void(*to_bed_line_functor)(char *,
         cat2generic_stage.src = -1;
         cat2generic_stage.dest = 0;
         cat2generic_stage.description = "Generic data from stdin";
+        cat2generic_stage.pid = 0;
         
         generic2bed_unsorted_stage.pipeset = p;
         generic2bed_unsorted_stage.line_functor = generic2bed_unsorted_line_functor;
         generic2bed_unsorted_stage.src = 0;
         generic2bed_unsorted_stage.dest = 1;
         generic2bed_unsorted_stage.description = "Generic data to unsorted BED";
+        generic2bed_unsorted_stage.pid = 0;
 
         bed_unsorted2bed_sorted_stage.pipeset = p;
         bed_unsorted2bed_sorted_stage.line_functor = NULL;
         bed_unsorted2bed_sorted_stage.src = 1;
         bed_unsorted2bed_sorted_stage.dest = 2;
         bed_unsorted2bed_sorted_stage.description = "Unsorted BED to sorted BED";
+        bed_unsorted2bed_sorted_stage.pid = 0;
 
         bed_sorted2starch_stage.pipeset = p;
         bed_sorted2starch_stage.line_functor = NULL;
         bed_sorted2starch_stage.src = 2;
         bed_sorted2starch_stage.dest = 3;
         bed_sorted2stdout_stage.description = "Sorted BED to Starch";
+        bed_sorted2starch_stage.pid = 0;
 
         starch2stdout_stage.pipeset = p;
         starch2stdout_stage.line_functor = NULL;
         starch2stdout_stage.src = 3;
         starch2stdout_stage.dest = -1;
         starch2stdout_stage.description = "Starch to stdout";
+        starch2stdout_stage.pid = 0;
     }
     else {
         fprintf(stderr, "Error: Unknown conversion parameter combination\n");
@@ -263,13 +272,15 @@ c2b_init_generic_conversion(c2b_pipeset_t *p, void(*to_bed_line_functor)(char *,
     fprintf(stderr, "Debug: c2b_cmd_cat_stdin: [%s]\n", cat2generic_cmd);
 #endif
 
-    cat2generic_proc = c2b_popen4(cat2generic_cmd,
-                                  p->in[0],
-                                  p->out[0],
-                                  p->err[0],
-                                  POPEN4_FLAG_NONE);
+    generic2bed_unsorted_stage.pid = c2b_popen4(cat2generic_cmd,
+                                                p->in[0],
+                                                p->out[0],
+                                                p->err[0],
+                                                POPEN4_FLAG_NONE);
 
-    if (waitpid(cat2generic_proc, &generic2bed_unsorted_stage.status, WNOHANG | WUNTRACED) == -1) {
+    if (waitpid(generic2bed_unsorted_stage.pid, 
+                &generic2bed_unsorted_stage.status, 
+                WNOHANG | WUNTRACED) == -1) {
         errsv = errno;
         fprintf(stderr, "Error: Generic stdin stage waitpid() call failed (%s)\n", (errsv == ECHILD ? "ECHILD" : (errsv == EINTR ? "EINTR" : "EINVAL")));
         exit(errsv);
@@ -281,13 +292,15 @@ c2b_init_generic_conversion(c2b_pipeset_t *p, void(*to_bed_line_functor)(char *,
         fprintf(stderr, "Debug: c2b_cmd_sort_bed: [%s]\n", bed_unsorted2bed_sorted_cmd);
 #endif
 
-        bed_unsorted2bed_sorted_proc = c2b_popen4(bed_unsorted2bed_sorted_cmd,
-                                                  p->in[2],
-                                                  p->out[2],
-                                                  p->err[2],
-                                                  POPEN4_FLAG_NONE);
+        bed_unsorted2bed_sorted_stage.pid = c2b_popen4(bed_unsorted2bed_sorted_cmd,
+                                                       p->in[2],
+                                                       p->out[2],
+                                                       p->err[2],
+                                                       POPEN4_FLAG_NONE);
 
-        if (waitpid(bed_unsorted2bed_sorted_proc, &bed_unsorted2bed_sorted_stage.status, WNOHANG | WUNTRACED) == -1) {
+        if (waitpid(bed_unsorted2bed_sorted_stage.pid, 
+                    &bed_unsorted2bed_sorted_stage.status, 
+                    WNOHANG | WUNTRACED) == -1) {
             errsv = errno;
             fprintf(stderr, "Error: Sort stage waitpid() call failed (%s)\n", (errsv == ECHILD ? "ECHILD" : (errsv == EINTR ? "EINTR" : "EINVAL")));
             exit(errsv);
@@ -300,13 +313,15 @@ c2b_init_generic_conversion(c2b_pipeset_t *p, void(*to_bed_line_functor)(char *,
         fprintf(stderr, "Debug: c2b_cmd_starch_bed: [%s]\n", bed_sorted2starch_cmd);
 #endif
 
-        bed_sorted2starch_proc = c2b_popen4(bed_sorted2starch_cmd,
-                                            p->in[3],
-                                            p->out[3],
-                                            p->err[3],
-                                            POPEN4_FLAG_NONE);
+        bed_sorted2starch_stage.pid = c2b_popen4(bed_sorted2starch_cmd,
+                                                 p->in[3],
+                                                 p->out[3],
+                                                 p->err[3],
+                                                 POPEN4_FLAG_NONE);
 
-        if (waitpid(bed_sorted2starch_proc, &bed_sorted2starch_stage.status, WNOHANG | WUNTRACED) == -1) {
+        if (waitpid(bed_sorted2starch_stage.pid, 
+                    &bed_sorted2starch_stage.status, 
+                    WNOHANG | WUNTRACED) == -1) {
             errsv = errno;
             fprintf(stderr, "Error: Compression stage waitpid() call failed (%s)\n", (errsv == ECHILD ? "ECHILD" : (errsv == EINTR ? "EINTR" : "EINVAL")));
             exit(errsv);
@@ -415,9 +430,6 @@ c2b_init_bam_conversion(c2b_pipeset_t *p)
     pthread_t bed_sorted2stdout_thread;
     pthread_t bed_sorted2starch_thread;
     pthread_t starch2stdout_thread;
-    pid_t bam2sam_proc;
-    pid_t bed_unsorted2bed_sorted_proc;
-    pid_t bed_sorted2starch_proc;
     c2b_pipeline_stage_t bam2sam_stage;
     c2b_pipeline_stage_t sam2bed_unsorted_stage;
     c2b_pipeline_stage_t bed_unsorted2stdout_stage;
@@ -441,18 +453,21 @@ c2b_init_bam_conversion(c2b_pipeset_t *p)
         bam2sam_stage.src = -1;
         bam2sam_stage.dest = 0;
         bam2sam_stage.description = "BAM data from stdin to SAM";
+        bam2sam_stage.pid = 0;
         
         sam2bed_unsorted_stage.pipeset = p;
         sam2bed_unsorted_stage.line_functor = sam2bed_unsorted_line_functor;
         sam2bed_unsorted_stage.src = 0;
         sam2bed_unsorted_stage.dest = 1;
         sam2bed_unsorted_stage.description = "SAM to unsorted BED";
+        sam2bed_unsorted_stage.pid = 0;
 
         bed_unsorted2stdout_stage.pipeset = p;
         bed_unsorted2stdout_stage.line_functor = NULL;
         bed_unsorted2stdout_stage.src = 1;
         bed_unsorted2stdout_stage.dest = -1;
         bed_unsorted2stdout_stage.description = "Unsorted BED to stdout";
+        bed_unsorted2stdout_stage.pid = 0;
     }
     else if (c2b_globals.output_format_idx == BED_FORMAT) {
         bam2sam_stage.pipeset = p;
@@ -460,24 +475,28 @@ c2b_init_bam_conversion(c2b_pipeset_t *p)
         bam2sam_stage.src = -1;
         bam2sam_stage.dest = 0;
         bam2sam_stage.description = "BAM data from stdin to SAM";
+        bam2sam_stage.pid = 0;
         
         sam2bed_unsorted_stage.pipeset = p;
         sam2bed_unsorted_stage.line_functor = sam2bed_unsorted_line_functor;
         sam2bed_unsorted_stage.src = 0;
         sam2bed_unsorted_stage.dest = 1;
         sam2bed_unsorted_stage.description = "SAM to unsorted BED";
+        sam2bed_unsorted_stage.pid = 0;
         
         bed_unsorted2bed_sorted_stage.pipeset = p;
         bed_unsorted2bed_sorted_stage.line_functor = NULL;
         bed_unsorted2bed_sorted_stage.src = 1;
         bed_unsorted2bed_sorted_stage.dest = 2;
         bed_unsorted2bed_sorted_stage.description = "Unsorted BED to sorted BED";
+        bed_unsorted2bed_sorted_stage.pid = 0;
 
         bed_sorted2stdout_stage.pipeset = p;
         bed_sorted2stdout_stage.line_functor = NULL;
         bed_sorted2stdout_stage.src = 2;
         bed_sorted2stdout_stage.dest = -1;
         bed_sorted2stdout_stage.description = "Sorted BED to stdout";
+        bed_sorted2stdout_stage.pid = 0;
     }
     else if (c2b_globals.output_format_idx == STARCH_FORMAT) {
         bam2sam_stage.pipeset = p;
@@ -485,30 +504,35 @@ c2b_init_bam_conversion(c2b_pipeset_t *p)
         bam2sam_stage.src = -1;
         bam2sam_stage.dest = 0;
         bam2sam_stage.description = "BAM data from stdin to SAM";
+        bam2sam_stage.pid = 0;
         
         sam2bed_unsorted_stage.pipeset = p;
         sam2bed_unsorted_stage.line_functor = sam2bed_unsorted_line_functor;
         sam2bed_unsorted_stage.src = 0;
         sam2bed_unsorted_stage.dest = 1;
         sam2bed_unsorted_stage.description = "SAM to unsorted BED";
+        sam2bed_unsorted_stage.pid = 0;
 
         bed_unsorted2bed_sorted_stage.pipeset = p;
         bed_unsorted2bed_sorted_stage.line_functor = NULL;
         bed_unsorted2bed_sorted_stage.src = 1;
         bed_unsorted2bed_sorted_stage.dest = 2;
         bed_unsorted2bed_sorted_stage.description = "Unsorted BED to sorted BED";
+        bed_unsorted2bed_sorted_stage.pid = 0;
 
         bed_sorted2starch_stage.pipeset = p;
         bed_sorted2starch_stage.line_functor = NULL;
         bed_sorted2starch_stage.src = 2;
         bed_sorted2starch_stage.dest = 3;
         bed_sorted2starch_stage.description = "Sorted BED to Starch";
+        bed_sorted2starch_stage.pid = 0;
 
         starch2stdout_stage.pipeset = p;
         starch2stdout_stage.line_functor = NULL;
         starch2stdout_stage.src = 3;
         starch2stdout_stage.dest = -1;
         starch2stdout_stage.description = "Starch to stdout";
+        starch2stdout_stage.pid = 0;
     }
     else {
         fprintf(stderr, "Error: Unknown BAM conversion parameter combination\n");
@@ -525,13 +549,15 @@ c2b_init_bam_conversion(c2b_pipeset_t *p)
     fprintf(stderr, "Debug: c2b_cmd_bam_to_sam: [%s]\n", bam2sam_cmd);
 #endif
 
-    bam2sam_proc = c2b_popen4(bam2sam_cmd,
-			      p->in[0],
-			      p->out[0],
-			      p->err[0],
-			      POPEN4_FLAG_NONE);
+    bam2sam_stage.pid = c2b_popen4(bam2sam_cmd,
+                                   p->in[0],
+                                   p->out[0],
+                                   p->err[0],
+                                   POPEN4_FLAG_NONE);
 
-    if (waitpid(bam2sam_proc, &bam2sam_stage.status, WNOHANG | WUNTRACED) == -1) {
+    if (waitpid(bam2sam_stage.pid, 
+                &bam2sam_stage.status, 
+                WNOHANG | WUNTRACED) == -1) {
         errsv = errno;
         fprintf(stderr, "Error: BAM-to-SAM stage waitpid() call failed (%s)\n", (errsv == ECHILD ? "ECHILD" : (errsv == EINTR ? "EINTR" : "EINVAL")));
         exit(errsv);
@@ -543,13 +569,15 @@ c2b_init_bam_conversion(c2b_pipeset_t *p)
         fprintf(stderr, "Debug: c2b_cmd_sort_bed: [%s]\n", bed_unsorted2bed_sorted_cmd);
 #endif
 
-        bed_unsorted2bed_sorted_proc = c2b_popen4(bed_unsorted2bed_sorted_cmd,
-                                                  p->in[2],
-                                                  p->out[2],
-                                                  p->err[2],
-                                                  POPEN4_FLAG_NONE);
+        bed_unsorted2bed_sorted_stage.pid = c2b_popen4(bed_unsorted2bed_sorted_cmd,
+                                                       p->in[2],
+                                                       p->out[2],
+                                                       p->err[2],
+                                                       POPEN4_FLAG_NONE);
         
-        if (waitpid(bed_unsorted2bed_sorted_proc, &bed_unsorted2bed_sorted_stage.status, WNOHANG | WUNTRACED) == -1) {
+        if (waitpid(bed_unsorted2bed_sorted_stage.pid, 
+                    &bed_unsorted2bed_sorted_stage.status, 
+                    WNOHANG | WUNTRACED) == -1) {
             errsv = errno;
             fprintf(stderr, "Error: Sort stage waitpid() call failed (%s)\n", (errsv == ECHILD ? "ECHILD" : (errsv == EINTR ? "EINTR" : "EINVAL")));
             exit(errsv);
@@ -562,13 +590,15 @@ c2b_init_bam_conversion(c2b_pipeset_t *p)
         fprintf(stderr, "Debug: c2b_cmd_starch_bed: [%s]\n", bed_sorted2starch_cmd);
 #endif
 
-        bed_sorted2starch_proc = c2b_popen4(bed_sorted2starch_cmd,
-                                            p->in[3],
-                                            p->out[3],
-                                            p->err[3],
-                                            POPEN4_FLAG_NONE);
+        bed_sorted2starch_stage.pid = c2b_popen4(bed_sorted2starch_cmd,
+                                                 p->in[3],
+                                                 p->out[3],
+                                                 p->err[3],
+                                                 POPEN4_FLAG_NONE);
 
-        if (waitpid(bed_sorted2starch_proc, &bed_sorted2starch_stage.status, WNOHANG | WUNTRACED) == -1) {
+        if (waitpid(bed_sorted2starch_stage.pid, 
+                    &bed_sorted2starch_stage.status, 
+                    WNOHANG | WUNTRACED) == -1) {
             errsv = errno;
             fprintf(stderr, "Error: Compression stage waitpid() call failed (%s)\n", (errsv == ECHILD ? "ECHILD" : (errsv == EINTR ? "EINTR" : "EINVAL")));
             exit(errsv);
@@ -1985,18 +2015,9 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
                 }
                 break;
             case 'N':
-                sprintf(modified_qname_str, "%s/%zu", qname_str, block_idx++);
-                sam.qname = modified_qname_str;
-                c2b_line_convert_sam_to_bed(sam, dest_line_str);
-                memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
-                *dest_size += strlen(dest_line_str);
-                sam.stop += bases;
-                sam.start = sam.stop;
-                break;
             case 'D':
                 sam.stop += bases;
                 sam.start = sam.stop;
-                break;
             case 'H':
             case 'I':
             case 'P':
@@ -2130,7 +2151,7 @@ c2b_line_convert_sam_to_bed(c2b_sam_t s, char *dest_line)
        POS - 1                   2                      start
        POS + length(CIGAR) - 1   3                      stop
        QNAME                     4                      id
-       FLAG                      5                      score
+       MAPQ                      5                      score
        16 & FLAG                 6                      strand
 
        If NOT (4 & FLAG) is true, then the read is mapped.
@@ -2139,7 +2160,7 @@ c2b_line_convert_sam_to_bed(c2b_sam_t s, char *dest_line)
 
        SAM field                 BED column index       BED field
        -------------------------------------------------------------------------
-       MAPQ                      7                      -
+       FLAG                      7                      -
        CIGAR                     8                      -
        RNEXT                     9                      -
        PNEXT                     10                     -
@@ -2160,9 +2181,9 @@ c2b_line_convert_sam_to_bed(c2b_sam_t s, char *dest_line)
                 "%" PRIu64 "\t"                 \
                 "%" PRIu64 "\t"                 \
                 "%s\t"                          \
+                "%s\t"                          \
+                "%s\t"                          \
                 "%d\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
                 "%s\t"                          \
                 "%s\t"                          \
                 "%s\t"                          \
@@ -2174,9 +2195,9 @@ c2b_line_convert_sam_to_bed(c2b_sam_t s, char *dest_line)
                 s.start,
                 s.stop,
                 s.qname,
-                s.flag,
-                s.strand,
                 s.mapq,
+                s.strand,
+                s.flag,
                 s.cigar,
                 s.rnext,
                 s.pnext,
@@ -2193,6 +2214,7 @@ c2b_line_convert_sam_to_bed(c2b_sam_t s, char *dest_line)
                 "%s\t"                          \
                 "%s\t"                          \
                 "%s\t"                          \
+                "%d\t"                          \
                 "%s\t"                          \
                 "%s\t"                          \
                 "%s\t"                          \
@@ -2203,8 +2225,9 @@ c2b_line_convert_sam_to_bed(c2b_sam_t s, char *dest_line)
                 s.start,
                 s.stop,
                 s.qname,
-                s.strand,
                 s.mapq,
+                s.strand,
+                s.flag,
                 s.cigar,
                 s.rnext,
                 s.pnext,
@@ -2863,7 +2886,8 @@ c2b_read_bytes_from_stdin(void *arg)
 #pragma GCC diagnostic pop
     close(pipes->in[stage->dest][PIPE_WRITE]);
 
-    if (WIFEXITED(stage->status)) {
+    if (WIFEXITED(stage->status) || WIFSIGNALED(stage->status)) {
+        waitpid(stage->pid, &stage->status, WUNTRACED);
         exit_status = WEXITSTATUS(stage->status);
         if (exit_status != 0) 
             fprintf(stderr, 
@@ -2872,6 +2896,7 @@ c2b_read_bytes_from_stdin(void *arg)
                     stage->status, 
                     exit_status);
     }
+
 
     pthread_exit(NULL);
 }
@@ -3026,7 +3051,8 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
     if (dest_buffer)
         free(dest_buffer), dest_buffer = NULL;
 
-    if (WIFEXITED(stage->status)) {
+    if (WIFEXITED(stage->status) || WIFSIGNALED(stage->status)) {
+        waitpid(stage->pid, &stage->status, WUNTRACED);
         exit_status = WEXITSTATUS(stage->status);
         if (exit_status != 0) 
             fprintf(stderr, 
@@ -3058,7 +3084,8 @@ c2b_write_in_bytes_to_in_process(void *arg)
 
     close(pipes->in[stage->dest][PIPE_WRITE]);
 
-    if (WIFEXITED(stage->status)) {
+    if (WIFEXITED(stage->status) || WIFSIGNALED(stage->status)) {
+        waitpid(stage->pid, &stage->status, WUNTRACED);
         exit_status = WEXITSTATUS(stage->status);
         if (exit_status != 0) 
             fprintf(stderr, 
@@ -3090,7 +3117,8 @@ c2b_write_out_bytes_to_in_process(void *arg)
 
     close(pipes->in[stage->dest][PIPE_WRITE]);
 
-    if (WIFEXITED(stage->status)) {
+    if (WIFEXITED(stage->status) || WIFSIGNALED(stage->status)) {
+        waitpid(stage->pid, &stage->status, WUNTRACED);
         exit_status = WEXITSTATUS(stage->status);
         if (exit_status != 0) 
             fprintf(stderr, 
@@ -3119,7 +3147,8 @@ c2b_write_in_bytes_to_stdout(void *arg)
     }
 #pragma GCC diagnostic pop
 
-    if (WIFEXITED(stage->status)) {
+    if (WIFEXITED(stage->status) || WIFSIGNALED(stage->status)) {
+        waitpid(stage->pid, &stage->status, WUNTRACED);
         exit_status = WEXITSTATUS(stage->status);
         if (exit_status != 0) 
             fprintf(stderr, 
@@ -3141,10 +3170,6 @@ c2b_write_out_bytes_to_stdout(void *arg)
     ssize_t bytes_read;
     int exit_status;
 
-#ifdef DEBUG
-    fprintf(stderr, "\t-> c2b_write_out_bytes_to_stdout | reading from fd  (%02d) | writing to fd  (%02d)\n", pipes->out[stage->src][PIPE_READ], STDOUT_FILENO);
-#endif
-
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-result"
     while ((bytes_read = read(pipes->out[stage->src][PIPE_READ], buffer, C2B_MAX_LINE_LENGTH_VALUE)) > 0) {
@@ -3152,7 +3177,8 @@ c2b_write_out_bytes_to_stdout(void *arg)
     }
 #pragma GCC diagnostic pop
 
-    if (WIFEXITED(stage->status)) {
+    if (WIFEXITED(stage->status) || WIFSIGNALED(stage->status)) {
+        waitpid(stage->pid, &stage->status, WUNTRACED);
         exit_status = WEXITSTATUS(stage->status);
         if (exit_status != 0) 
             fprintf(stderr, 
@@ -4502,3 +4528,4 @@ c2b_to_output_format(const char *output_format)
         (strcmp(output_format, "starch") == 0) ? STARCH_FORMAT :
         UNDEFINED_FORMAT;
 }
+
