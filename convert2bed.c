@@ -1963,8 +1963,7 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
 
     /* Optional fields */
     char opt_str[C2B_MAX_FIELD_LENGTH_VALUE];
-    //memset(opt_str, 0, strlen(opt_str));
-    memset(opt_str, 0, 1);
+    memset(opt_str, 0, strlen(opt_str));
     if (sam_field_offsets[11] != -1) {
         for (int field_idx = 11; field_idx <= sam_field_idx; field_idx++) {
             ssize_t opt_size = sam_field_offsets[field_idx] - sam_field_offsets[field_idx - 1] - (field_idx == sam_field_idx ? 1 : 0);
