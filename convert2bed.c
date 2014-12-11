@@ -994,14 +994,11 @@ c2b_line_convert_gtf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
        Convert GTF struct to BED string and copy it to destination
     */
 
-    char dest_line_str[C2B_MAX_LINE_LENGTH_VALUE];
-    c2b_line_convert_gtf_to_bed(gtf, dest_line_str);
-    memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
-    *dest_size += strlen(dest_line_str);
+    c2b_line_convert_gtf_to_bed(gtf, dest, dest_size);
 }
 
 static inline void
-c2b_line_convert_gtf_to_bed(c2b_gtf_t g, char *dest_line)
+c2b_line_convert_gtf_to_bed(c2b_gtf_t g, char *dest_line, ssize_t *dest_size)
 {
     /* 
        For GTF-formatted data, we use the mapping provided by BEDOPS convention described at:
@@ -1034,52 +1031,52 @@ c2b_line_convert_gtf_to_bed(c2b_gtf_t g, char *dest_line)
     */
 
     if (strlen(g.comments) == 0) {
-        sprintf(dest_line,
-                "%s\t"                          \
-                "%" PRIu64 "\t"                 \
-                "%" PRIu64 "\t"                 \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\n",
-                g.seqname,
-                g.start,
-                g.end,
-                g.id,
-                g.score,
-                g.strand,
-                g.source,
-                g.feature,
-                g.frame,
-                g.attributes);
+        *dest_size += sprintf(dest_line + *dest_size,
+                              "%s\t"            \
+                              "%" PRIu64 "\t"   \
+                              "%" PRIu64 "\t"   \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\n",
+                              g.seqname,
+                              g.start,
+                              g.end,
+                              g.id,
+                              g.score,
+                              g.strand,
+                              g.source,
+                              g.feature,
+                              g.frame,
+                              g.attributes);
     }
     else {
-        sprintf(dest_line,
-                "%s\t"                          \
-                "%" PRIu64 "\t"                 \
-                "%" PRIu64 "\t"                 \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\n",
-                g.seqname,
-                g.start,
-                g.end,
-                g.id,
-                g.score,
-                g.strand,
-                g.source,
-                g.feature,
-                g.frame,
-                g.attributes,
-                g.comments);
+        *dest_size += sprintf(dest_line + *dest_size,
+                              "%s\t"            \
+                              "%" PRIu64 "\t"   \
+                              "%" PRIu64 "\t"   \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\n",
+                              g.seqname,
+                              g.start,
+                              g.end,
+                              g.id,
+                              g.score,
+                              g.strand,
+                              g.source,
+                              g.feature,
+                              g.frame,
+                              g.attributes,
+                              g.comments);
     }
 }
 
@@ -1246,14 +1243,11 @@ c2b_line_convert_gff_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
        Convert GFF struct to BED string and copy it to destination
     */
 
-    char dest_line_str[C2B_MAX_LINE_LENGTH_VALUE];
-    c2b_line_convert_gff_to_bed(gff, dest_line_str);
-    memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
-    *dest_size += strlen(dest_line_str);
+    c2b_line_convert_gff_to_bed(gff, dest, dest_size);
 }
 
 static inline void
-c2b_line_convert_gff_to_bed(c2b_gff_t g, char *dest_line)
+c2b_line_convert_gff_to_bed(c2b_gff_t g, char *dest_line, ssize_t *dest_size)
 {
     /* 
        For GFF-formatted data, we use the mapping provided by BEDOPS convention described at:
@@ -1279,27 +1273,27 @@ c2b_line_convert_gff_to_bed(c2b_gff_t g, char *dest_line)
        attributes                10                     -
     */
 
-    sprintf(dest_line,
-            "%s\t"                              \
-            "%" PRIu64 "\t"                     \
-            "%" PRIu64 "\t"                     \
-            "%s\t"                              \
-            "%s\t"                              \
-            "%s\t"                              \
-            "%s\t"                              \
-            "%s\t"                              \
-            "%s\t"                              \
-            "%s\n",
-            g.seqid,
-            g.start,
-            g.end,
-            g.id,
-            g.score,
-            g.strand,
-            g.source,
-            g.type,
-            g.phase,
-            g.attributes);
+    *dest_size += sprintf(dest_line + *dest_size,
+                          "%s\t"                \
+                          "%" PRIu64 "\t"       \
+                          "%" PRIu64 "\t"       \
+                          "%s\t"                \
+                          "%s\t"                \
+                          "%s\t"                \
+                          "%s\t"                \
+                          "%s\t"                \
+                          "%s\t"                \
+                          "%s\n",
+                          g.seqid,
+                          g.start,
+                          g.end,
+                          g.id,
+                          g.score,
+                          g.strand,
+                          g.source,
+                          g.type,
+                          g.phase,
+                          g.attributes);
 }
 
 static void
@@ -1540,14 +1534,11 @@ c2b_line_convert_psl_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
        Convert PSL struct to BED string and copy it to destination
     */
 
-    char dest_line_str[C2B_MAX_LINE_LENGTH_VALUE];
-    c2b_line_convert_psl_to_bed(psl, dest_line_str);
-    memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
-    *dest_size += strlen(dest_line_str);    
+    c2b_line_convert_psl_to_bed(psl, dest, dest_size);
 }
 
 static inline void
-c2b_line_convert_psl_to_bed(c2b_psl_t p, char *dest_line)
+c2b_line_convert_psl_to_bed(c2b_psl_t p, char *dest_line, ssize_t *dest_size)
 {
     /* 
        For PSL-formatted data, we use the mapping provided by BEDOPS convention described at:
@@ -1584,49 +1575,49 @@ c2b_line_convert_psl_to_bed(c2b_psl_t p, char *dest_line)
        tStarts                   21                     -
     */
 
-    sprintf(dest_line,
-            "%s\t"                              \
-            "%" PRIu64 "\t"                     \
-            "%" PRIu64 "\t"                     \
-            "%s\t"                              \
-            "%" PRIu64 "\t"                     \
-            "%s\t"                              \
-            "%" PRIu64 "\t"                     \
-            "%" PRIu64 "\t"                     \
-            "%" PRIu64 "\t"                     \
-            "%" PRIu64 "\t"                     \
-            "%" PRIu64 "\t"                     \
-            "%" PRIu64 "\t"                     \
-            "%" PRIu64 "\t"                     \
-            "%" PRIu64 "\t"                     \
-            "%" PRIu64 "\t"                     \
-            "%" PRIu64 "\t"                     \
-            "%" PRIu64 "\t"                     \
-            "%" PRIu64 "\t"                     \
-            "%s\t"                              \
-            "%s\t"                              \
-            "%s\n",
-            p.tName,
-            p.tStart,
-            p.tEnd,
-            p.qName,
-            p.qSize,
-            p.strand,
-            p.matches,
-            p.misMatches,
-            p.repMatches,
-            p.nCount,
-            p.qNumInsert,
-            p.qBaseInsert,
-            p.tNumInsert,
-            p.tBaseInsert,
-            p.qStart,
-            p.qEnd,
-            p.tSize,
-            p.blockCount,
-            p.blockSizes,
-            p.qStarts,
-            p.tStarts);
+    *dest_size += sprintf(dest_line + *dest_size,
+                          "%s\t"                \
+                          "%" PRIu64 "\t"       \
+                          "%" PRIu64 "\t"       \
+                          "%s\t"                \
+                          "%" PRIu64 "\t"       \
+                          "%s\t"                \
+                          "%" PRIu64 "\t"       \
+                          "%" PRIu64 "\t"       \
+                          "%" PRIu64 "\t"       \
+                          "%" PRIu64 "\t"       \
+                          "%" PRIu64 "\t"       \
+                          "%" PRIu64 "\t"       \
+                          "%" PRIu64 "\t"       \
+                          "%" PRIu64 "\t"       \
+                          "%" PRIu64 "\t"       \
+                          "%" PRIu64 "\t"       \
+                          "%" PRIu64 "\t"       \
+                          "%" PRIu64 "\t"       \
+                          "%s\t"                \
+                          "%s\t"                \
+                          "%s\n",
+                          p.tName,
+                          p.tStart,
+                          p.tEnd,
+                          p.qName,
+                          p.qSize,
+                          p.strand,
+                          p.matches,
+                          p.misMatches,
+                          p.repMatches,
+                          p.nCount,
+                          p.qNumInsert,
+                          p.qBaseInsert,
+                          p.tNumInsert,
+                          p.tBaseInsert,
+                          p.qStart,
+                          p.qEnd,
+                          p.tSize,
+                          p.blockCount,
+                          p.blockSizes,
+                          p.qStarts,
+                          p.tStarts);
 }
 
 static void
@@ -1996,8 +1987,6 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
     sam.qual = qual_str;
     sam.opt = opt_str;
 
-    //char dest_line_str[C2B_MAX_LINE_LENGTH_VALUE];
-    
     for (op_idx = 0, block_idx = 1; op_idx < c2b_globals.sam->cigar->length; ++op_idx) {
         char current_op = c2b_globals.sam->cigar->ops[op_idx].operation;
         unsigned int bases = c2b_globals.sam->cigar->ops[op_idx].bases;
@@ -2008,9 +1997,6 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
                 if ((previous_op == default_cigar_op_operation) || (previous_op == 'D') || (previous_op == 'N')) {
                     sprintf(modified_qname_str, "%s/%zu", qname_str, block_idx++);
                     sam.qname = modified_qname_str;
-                    //c2b_line_convert_sam_to_bed(sam, dest_line_str);
-                    //memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
-                    //*dest_size += strlen(dest_line_str);
                     c2b_line_convert_sam_to_bed(sam, dest, dest_size);
                     sam.start = stop_val;
                 }
@@ -2037,9 +2023,6 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
     */
 
     if (block_idx == 1) {
-        //c2b_line_convert_sam_to_bed(sam, dest_line_str);
-        //memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
-        //*dest_size += strlen(dest_line_str);
         c2b_line_convert_sam_to_bed(sam, dest, dest_size);
     }
 }
@@ -2380,8 +2363,6 @@ c2b_line_convert_vcf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
     vcf.format = format_str;
     vcf.samples = samples_str;
 
-    char dest_line_str[C2B_MAX_LINE_LENGTH_VALUE];
-
     if ((!c2b_globals.vcf->do_not_split) && (memchr(alt_str, c2b_vcf_alt_allele_delim, strlen(alt_str)))) {
 
         /* loop through each allele */
@@ -2404,9 +2385,7 @@ c2b_line_convert_vcf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
                  ((c2b_globals.vcf->only_insertions) && (c2b_vcf_record_is_insertion(ref_str, vcf.alt))) ||
                  ((c2b_globals.vcf->only_deletions) && (c2b_vcf_record_is_deletion(ref_str, vcf.alt))) ) 
                 {
-                    c2b_line_convert_vcf_to_bed(vcf, dest_line_str);
-                    memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
-                    *dest_size += strlen(dest_line_str);
+                    c2b_line_convert_vcf_to_bed(vcf, dest, dest_size);
                 }
         }
         free(alt_alleles_copy), alt_alleles_copy = NULL;
@@ -2423,9 +2402,7 @@ c2b_line_convert_vcf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, 
              ((c2b_globals.vcf->only_insertions) && (c2b_vcf_record_is_insertion(ref_str, alt_str))) ||
              ((c2b_globals.vcf->only_deletions) && (c2b_vcf_record_is_deletion(ref_str, alt_str))) ) 
             {
-                c2b_line_convert_vcf_to_bed(vcf, dest_line_str);
-                memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
-                *dest_size += strlen(dest_line_str);
+                c2b_line_convert_vcf_to_bed(vcf, dest, dest_size);
             }
     }
 }
@@ -2455,7 +2432,7 @@ c2b_vcf_record_is_deletion(char *ref, char *alt)
 }
 
 static inline void
-c2b_line_convert_vcf_to_bed(c2b_vcf_t v, char *dest_line) 
+c2b_line_convert_vcf_to_bed(c2b_vcf_t v, char *dest_line, ssize_t *dest_size) 
 {
     /* 
        For VCF v4.2-formatted data, we use the mapping provided by BEDOPS convention described at:
@@ -2493,50 +2470,50 @@ c2b_line_convert_vcf_to_bed(c2b_vcf_t v, char *dest_line)
     */
 
     if (strlen(v.format) > 0) {
-        sprintf(dest_line,
-                "%s\t"                          \
-                "%" PRIu64 "\t"                 \
-                "%" PRIu64 "\t"                 \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\n",
-                v.chrom,
-                v.start,
-                v.end,
-                v.id,
-                v.qual,
-                v.ref,
-                v.alt,
-                v.filter,
-                v.info,
-                v.format,
-                v.samples);
+        *dest_size += sprintf(dest_line + *dest_size,
+                              "%s\t"            \
+                              "%" PRIu64 "\t"   \
+                              "%" PRIu64 "\t"   \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\n",
+                              v.chrom,
+                              v.start,
+                              v.end,
+                              v.id,
+                              v.qual,
+                              v.ref,
+                              v.alt,
+                              v.filter,
+                              v.info,
+                              v.format,
+                              v.samples);
     }
     else {
-        sprintf(dest_line,
-                "%s\t"                          \
-                "%" PRIu64 "\t"                 \
-                "%" PRIu64 "\t"                 \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\n",
-                v.chrom,
-                v.start,
-                v.end,
-                v.id,
-                v.qual,
-                v.ref,
-                v.alt,
-                v.filter,
-                v.info);
+        *dest_size += sprintf(dest_line + *dest_size,
+                              "%s\t"            \
+                              "%" PRIu64 "\t"   \
+                              "%" PRIu64 "\t"   \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\n",
+                              v.chrom,
+                              v.start,
+                              v.end,
+                              v.id,
+                              v.qual,
+                              v.ref,
+                              v.alt,
+                              v.filter,
+                              v.info);
     }
 }
 

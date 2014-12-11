@@ -1106,11 +1106,11 @@ extern "C" {
     static inline void       c2b_cmd_sort_bed(char *cmd);
     static inline void       c2b_cmd_starch_bed(char *cmd);
     static void              c2b_line_convert_gff_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
-    static inline void       c2b_line_convert_gff_to_bed(c2b_gff_t g, char *dest_line);
+    static inline void       c2b_line_convert_gff_to_bed(c2b_gff_t g, char *dest_line, ssize_t *dest_size);
     static void              c2b_line_convert_gtf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
-    static inline void       c2b_line_convert_gtf_to_bed(c2b_gtf_t g, char *dest_line);
+    static inline void       c2b_line_convert_gtf_to_bed(c2b_gtf_t g, char *dest_line, ssize_t *dest_size);
     static void              c2b_line_convert_psl_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
-    static inline void       c2b_line_convert_psl_to_bed(c2b_psl_t p, char *dest_line);
+    static inline void       c2b_line_convert_psl_to_bed(c2b_psl_t p, char *dest_line, ssize_t *dest_size);
     static void              c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
     static void              c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *dest_size, char *src, ssize_t src_size); 
     static inline void       c2b_sam_cigar_str_to_ops(char *s);
@@ -1123,7 +1123,7 @@ extern "C" {
     static inline boolean    c2b_vcf_record_is_snv(char *ref, char *alt);
     static inline boolean    c2b_vcf_record_is_insertion(char *ref, char *alt);
     static inline boolean    c2b_vcf_record_is_deletion(char *ref, char *alt);
-    static inline void       c2b_line_convert_vcf_to_bed(c2b_vcf_t v, char *dest_line);
+    static inline void       c2b_line_convert_vcf_to_bed(c2b_vcf_t v, char *dest_line, ssize_t *dest_size);
     static void              c2b_line_convert_wig_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
     static void *            c2b_read_bytes_from_stdin(void *arg);
     static void *            c2b_process_intermediate_bytes_by_lines(void *arg);
