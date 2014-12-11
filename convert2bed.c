@@ -1996,7 +1996,7 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
     sam.qual = qual_str;
     sam.opt = opt_str;
 
-    char dest_line_str[C2B_MAX_LINE_LENGTH_VALUE];
+    //char dest_line_str[C2B_MAX_LINE_LENGTH_VALUE];
     
     for (op_idx = 0, block_idx = 1; op_idx < c2b_globals.sam->cigar->length; ++op_idx) {
         char current_op = c2b_globals.sam->cigar->ops[op_idx].operation;
@@ -2008,9 +2008,10 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
                 if ((previous_op == default_cigar_op_operation) || (previous_op == 'D') || (previous_op == 'N')) {
                     sprintf(modified_qname_str, "%s/%zu", qname_str, block_idx++);
                     sam.qname = modified_qname_str;
-                    c2b_line_convert_sam_to_bed(sam, dest_line_str);
-                    memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
-                    *dest_size += strlen(dest_line_str);
+                    //c2b_line_convert_sam_to_bed(sam, dest_line_str);
+                    //memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
+                    //*dest_size += strlen(dest_line_str);
+                    c2b_line_convert_sam_to_bed(sam, dest, dest_size);
                     sam.start = stop_val;
                 }
                 break;
@@ -2036,9 +2037,10 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
     */
 
     if (block_idx == 1) {
-        c2b_line_convert_sam_to_bed(sam, dest_line_str);
-        memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
-        *dest_size += strlen(dest_line_str);
+        //c2b_line_convert_sam_to_bed(sam, dest_line_str);
+        //memcpy(dest + *dest_size, dest_line_str, strlen(dest_line_str));
+        //*dest_size += strlen(dest_line_str);
+        c2b_line_convert_sam_to_bed(sam, dest, dest_size);
     }
 }
 
@@ -2138,7 +2140,7 @@ c2b_sam_delete_cigar_ops(c2b_cigar_t *c)
 }
 
 static inline void
-c2b_line_convert_sam_to_bed(c2b_sam_t s, char *dest_line)
+c2b_line_convert_sam_to_bed(c2b_sam_t s, char *dest_line, ssize_t *dest_size)
 {
     /*
        For SAM-formatted data, we use the mapping provided by BEDOPS convention described at: 
@@ -2176,64 +2178,64 @@ c2b_line_convert_sam_to_bed(c2b_sam_t s, char *dest_line)
     */
 
     if (strlen(s.opt)) {
-        sprintf(dest_line,
-                "%s\t"                          \
-                "%" PRIu64 "\t"                 \
-                "%" PRIu64 "\t"                 \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%d\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\n",
-                s.rname,
-                s.start,
-                s.stop,
-                s.qname,
-                s.mapq,
-                s.strand,
-                s.flag,
-                s.cigar,
-                s.rnext,
-                s.pnext,
-                s.tlen,
-                s.seq,
-                s.qual,
-                s.opt);
+        *dest_size += sprintf(dest_line + *dest_size,
+                              "%s\t"            \
+                              "%" PRIu64 "\t"   \
+                              "%" PRIu64 "\t"   \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%d\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\n",
+                              s.rname,
+                              s.start,
+                              s.stop,
+                              s.qname,
+                              s.mapq,
+                              s.strand,
+                              s.flag,
+                              s.cigar,
+                              s.rnext,
+                              s.pnext,
+                              s.tlen,
+                              s.seq,
+                              s.qual,
+                              s.opt);
     } 
     else {
-        sprintf(dest_line,
-                "%s\t"                          \
-                "%" PRIu64 "\t"                 \
-                "%" PRIu64 "\t"                 \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%d\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\t"                          \
-                "%s\n",
-                s.rname,
-                s.start,
-                s.stop,
-                s.qname,
-                s.mapq,
-                s.strand,
-                s.flag,
-                s.cigar,
-                s.rnext,
-                s.pnext,
-                s.tlen,
-                s.seq,
-                s.qual);
+        *dest_size += sprintf(dest_line + *dest_size,
+                              "%s\t"            \
+                              "%" PRIu64 "\t"   \
+                              "%" PRIu64 "\t"   \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%d\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\t"            \
+                              "%s\n",
+                              s.rname,
+                              s.start,
+                              s.stop,
+                              s.qname,
+                              s.mapq,
+                              s.strand,
+                              s.flag,
+                              s.cigar,
+                              s.rnext,
+                              s.pnext,
+                              s.tlen,
+                              s.seq,
+                              s.qual);
     }
 }
 
@@ -2942,6 +2944,7 @@ c2b_process_intermediate_bytes_by_lines(void *arg)
         c2b_print_usage(stderr);
         exit(ENOMEM); /* Not enough space (POSIX.1) */
     }
+    dest_buffer[0] = '\0';
 
     while ((src_bytes_read = read(pipes->out[stage->src][PIPE_READ],
                                   src_buffer + remainder_length,

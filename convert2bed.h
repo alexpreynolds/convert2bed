@@ -1117,7 +1117,7 @@ extern "C" {
     static void              c2b_sam_init_cigar_ops(c2b_cigar_t **c, const ssize_t size);
     static void              c2b_sam_debug_cigar_ops(c2b_cigar_t *c);
     static void              c2b_sam_delete_cigar_ops(c2b_cigar_t *c);
-    static inline void       c2b_line_convert_sam_to_bed(c2b_sam_t s, char *dest_line);
+    static inline void       c2b_line_convert_sam_to_bed(c2b_sam_t s, char *dest_line, ssize_t *dest_size);
     static void              c2b_line_convert_vcf_to_bed_unsorted(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
     static inline boolean    c2b_vcf_allele_is_id(char *s);
     static inline boolean    c2b_vcf_record_is_snv(char *ref, char *alt);
