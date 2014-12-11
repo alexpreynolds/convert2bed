@@ -25,6 +25,7 @@ debug: setup
 	$(CC) $(BLDFLAGS) $(CDFLAGS) $(OBJDIR)/$(PROG).o -o $(PROG) $(LIBS)
 
 profile: setup
+	$(CC) -shared -fPIC gprof-helper.c -o gprof-helper.so $(LIBS) -ldl
 	$(CC) $(BLDFLAGS) $(CPFLAGS) -c $(SOURCE) -o $(OBJDIR)/$(PROG).o $(INCLUDES)
 	$(CC) $(BLDFLAGS) $(CPFLAGS) $(OBJDIR)/$(PROG).o -o $(PROG) $(LIBS)
 
