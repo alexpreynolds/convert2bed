@@ -1743,9 +1743,10 @@ c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t
     memcpy(dest + *dest_size, src, qname_size);
     *dest_size += qname_size;
 
-    /* Field 5 - FLAG */
-    memcpy(dest + *dest_size, src + sam_field_offsets[0] + 1, flag_size);
-    *dest_size += flag_size;
+    /* Field 5 - MAPQ */
+    ssize_t mapq_size = sam_field_offsets[4] - sam_field_offsets[3];
+    memcpy(dest + *dest_size, src + sam_field_offsets[3] + 1, mapq_size);
+    *dest_size += mapq_size;
 
     /* Field 6 - 16 & FLAG */
     int strand_val = 0x10 & flag_val;
@@ -1754,10 +1755,9 @@ c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t
     memcpy(dest + *dest_size, strand_str, strlen(strand_str));
     *dest_size += strlen(strand_str);
 
-    /* Field 7 - MAPQ */
-    ssize_t mapq_size = sam_field_offsets[4] - sam_field_offsets[3];
-    memcpy(dest + *dest_size, src + sam_field_offsets[3] + 1, mapq_size);
-    *dest_size += mapq_size;
+    /* Field 7 - FLAG */
+    memcpy(dest + *dest_size, src + sam_field_offsets[0] + 1, flag_size);
+    *dest_size += flag_size;
 
     /* Field 8 - CIGAR */
     memcpy(dest + *dest_size, src + sam_field_offsets[4] + 1, cigar_size);
