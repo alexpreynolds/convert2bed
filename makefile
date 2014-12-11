@@ -35,4 +35,4 @@ install:
 clean:
 	rm -f $(PROG)
 	rm -rf $(OBJDIR)
-	rm -rf *~
+	rm -rf  *.so *~
