@@ -3,7 +3,7 @@
    -----------------------------------------------------------------------
    Copyright (C) 2014 Alex Reynolds
    
-   Wig2bed components, (C) 2011-2014 Scott Kuehn and Shane Neph
+   wig2bed components, (C) 2011-2014 Scott Kuehn and Shane Neph
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -2042,7 +2042,7 @@ c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *d
     }
 }
 
-static void
+static inline void
 c2b_sam_cigar_str_to_ops(char *s)
 {
     size_t s_idx;

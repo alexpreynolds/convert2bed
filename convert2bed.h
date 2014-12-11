@@ -3,7 +3,7 @@
    -----------------------------------------------------------------------
    Copyright (C) 2014 Alex Reynolds
 
-   Wig2bed components, (C) 2011-2014 Scott Kuehn and Shane Neph
+   wig2bed components, (C) 2011-2014 Scott Kuehn and Shane Neph
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1113,7 +1113,7 @@ extern "C" {
     static inline void       c2b_line_convert_psl_to_bed(c2b_psl_t p, char *dest_line);
     static void              c2b_line_convert_sam_to_bed_unsorted_without_split_operation(char *dest, ssize_t *dest_size, char *src, ssize_t src_size);
     static void              c2b_line_convert_sam_to_bed_unsorted_with_split_operation(char *dest, ssize_t *dest_size, char *src, ssize_t src_size); 
-    static void              c2b_sam_cigar_str_to_ops(char *s);
+    static inline void       c2b_sam_cigar_str_to_ops(char *s);
     static void              c2b_sam_init_cigar_ops(c2b_cigar_t **c, const ssize_t size);
     static void              c2b_sam_debug_cigar_ops(c2b_cigar_t *c);
     static void              c2b_sam_delete_cigar_ops(c2b_cigar_t *c);
