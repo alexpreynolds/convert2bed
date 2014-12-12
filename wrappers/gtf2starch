@@ -152,4 +152,4 @@ if [ "${starch_note_set}" = true ]; then options="${options} --starch-note=\"${s
 
 # format-specific
 
-echo ${cmd} ${options} - <&0
+${cmd} ${options} - <&0

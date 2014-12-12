@@ -194,4 +194,4 @@ if [ "${insertions}" = true ]; then options="${options} --insertions"; fi
 if [ "${deletions}" = true ]; then options="${options} --deletions"; fi
 if [ "${keep_header}" = true ]; then options="${options} --keep-header"; fi
 
-echo ${cmd} ${options} - <&0
+${cmd} ${options} - <&0

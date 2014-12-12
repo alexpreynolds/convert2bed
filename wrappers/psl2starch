@@ -170,4 +170,4 @@ if [ "${starch_note_set}" = true ]; then options="${options} --starch-note=\"${s
 if [ "${keep_header}" = true ]; then options="${options} --keep-header"; fi
 if [ "${split}" = true ]; then options="${options} --split"; fi
 
-echo ${cmd} ${options} - <&0
+${cmd} ${options} - <&0

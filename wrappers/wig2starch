@@ -170,4 +170,4 @@ if [ "${starch_note_set}" = true ]; then options="${options} --starch-note=\"${s
 
 if [ "${multisplit_set}" = true ]; then options="${options} --multisplit=\"${multisplit}\""; fi
 
-echo ${cmd} ${options} - <&0
+${cmd} ${options} - <&0
