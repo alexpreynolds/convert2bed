@@ -28,6 +28,7 @@ profile: setup
 	$(CC) -shared -fPIC gprof-helper.c -o gprof-helper.so $(LIBS) -ldl
 	$(CC) $(BLDFLAGS) $(CPFLAGS) -c $(SOURCE) -o $(OBJDIR)/$(PROG).o $(INCLUDES)
 	$(CC) $(BLDFLAGS) $(CPFLAGS) $(OBJDIR)/$(PROG).o -o $(PROG) $(LIBS)
+	@echo "\nNote: To profile convert2bed with gprof/pthreads, run:\n\t$$ LD_PRELOAD=/path/to/gprof-helper.so convert2bed"
 
 install:
 	cp -f $(PROG) /usr/local/bin
