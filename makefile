@@ -1,7 +1,8 @@
 BLDFLAGS                  = -Wall -Wextra -pedantic -std=c99
-CFLAGS                    = -D__STDC_CONSTANT_MACROS -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE=1 -O3
-CDFLAGS                   = -D__STDC_CONSTANT_MACROS -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE=1 -DDEBUG=1 -g -O0 -fno-inline
-CPFLAGS                   = -D__STDC_CONSTANT_MACROS -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE=1 -pg
+COMMONFLAGS               = -D__STDC_CONSTANT_MACROS -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE=1
+CFLAGS                    = -O3
+CDFLAGS                   = -DDEBUG=1 -g -O0 -fno-inline
+CPFLAGS                   = -pg
 LIBS                      = -lpthread
 INCLUDES                 := -iquote"${PWD}"
 OBJDIR                    = objects
@@ -17,17 +18,17 @@ setup:
 	mkdir -p $(OBJDIR)
 
 build: setup
-	$(CC) $(BLDFLAGS) $(CFLAGS) -c $(SOURCE) -o $(OBJDIR)/$(PROG).o $(INCLUDES)
-	$(CC) $(BLDFLAGS) $(CFLAGS) $(OBJDIR)/$(PROG).o -o $(PROG) $(LIBS)
+	$(CC) $(BLDFLAGS) $(COMMONFLAGS) $(CFLAGS) -c $(SOURCE) -o $(OBJDIR)/$(PROG).o $(INCLUDES)
+	$(CC) $(BLDFLAGS) $(COMMONFLAGS) $(CFLAGS) $(OBJDIR)/$(PROG).o -o $(PROG) $(LIBS)
 
 debug: setup
-	$(CC) $(BLDFLAGS) $(CDFLAGS) -c $(SOURCE) -o $(OBJDIR)/$(PROG).o $(INCLUDES)
-	$(CC) $(BLDFLAGS) $(CDFLAGS) $(OBJDIR)/$(PROG).o -o $(PROG) $(LIBS)
+	$(CC) $(BLDFLAGS) $(COMMONFLAGS) $(CDFLAGS) -c $(SOURCE) -o $(OBJDIR)/$(PROG).o $(INCLUDES)
+	$(CC) $(BLDFLAGS) $(COMMONFLAGS) $(CDFLAGS) $(OBJDIR)/$(PROG).o -o $(PROG) $(LIBS)
 
 profile: setup
 	$(CC) -shared -fPIC gprof-helper.c -o gprof-helper.so $(LIBS) -ldl
-	$(CC) $(BLDFLAGS) $(CPFLAGS) -c $(SOURCE) -o $(OBJDIR)/$(PROG).o $(INCLUDES)
-	$(CC) $(BLDFLAGS) $(CPFLAGS) $(OBJDIR)/$(PROG).o -o $(PROG) $(LIBS)
+	$(CC) $(BLDFLAGS) $(COMMONFLAGS) $(CPFLAGS) -c $(SOURCE) -o $(OBJDIR)/$(PROG).o $(INCLUDES)
+	$(CC) $(BLDFLAGS) $(COMMONFLAGS) $(CPFLAGS) $(OBJDIR)/$(PROG).o -o $(PROG) $(LIBS)
 	@echo "\nNote: To profile convert2bed with gprof/pthreads, run:\n\t$$ LD_PRELOAD=/path/to/gprof-helper.so convert2bed"
 
 install:
