@@ -5,7 +5,7 @@ The `convert2bed` tool converts common binary and text genomic formats ([BAM](ht
 
 Convenience wrapper `bash` scripts are provided for each format that convert standard input to unsorted or sorted BED, or to BEDOPS Starch (compressed BED). Scripts expose format-specific ``convert2bed`` options. 
 
-We also provide ``bam2bed_sge``, ``bam2bed_gnuParallel``, ``bam2starch_sge`` and ``bam2starch_gnuParallel`` convenience scripts, which parallelize the conversion of BAM to BED or to BEDOPS Starch via a [Sun Grid Engine](http://en.wikipedia.org/wiki/Oracle_Grid_Engine)-based computational cluster or local [GNU Parallel](http://en.wikipedia.org/wiki/GNU_parallel) installation.
+We also provide ``bam2bed_sge``, ``bam2bed_gnuParallel``, ``bam2starch_sge`` and ``bam2starch_gnuParallel`` convenience scripts, which parallelize the conversion of indexed BAM to BED or to BEDOPS Starch via a [Sun Grid Engine](http://en.wikipedia.org/wiki/Oracle_Grid_Engine)-based computational cluster or local [GNU Parallel](http://en.wikipedia.org/wiki/GNU_parallel) installation.
 
 Installation
 ------------
