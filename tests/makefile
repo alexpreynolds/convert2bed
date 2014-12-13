@@ -1,6 +1,9 @@
-.PHONY: bam
+formats := bam gff gtf psl sam vcf wig
 
-all: bam
+.PHONY: $(formats)
 
-bam:
-	$(MAKE) -C bam
+all: $(formats)
+	@echo "[convert2bed] tests complete!"
+
+$(formats):
+	@$(MAKE) -C $@
