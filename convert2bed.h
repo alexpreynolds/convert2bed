@@ -969,6 +969,8 @@ static const char *wig_description =                                    \
 
 static const char *wig_options =                                        \
     "  WIG conversion options:\n\n"                                     \
+    "  --keep-header (-k)\n"                                            \
+    "      Preserve header section as pseudo-BED elements\n"            \
     "  --multisplit=<basename> (-b <basename>)\n"                       \
     "      A single input file may have multiple WIG sections. With this option\n" \
     "      every section gets an ID prefix starting with <basename>.1, then\n" \

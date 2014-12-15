@@ -4,7 +4,7 @@ bin_dir="/usr/local/bin"
 wig2bed_bin="${bin_dir}/wig2bed"
 wig2starch_bin="${bin_dir}/wig2starch"
 
-for idx in $(seq 1 5)
+for idx in $(seq 1 6)
 do
     echo "[wig2bed] testing output [$idx]..." 
     sample_wig_fn="sample_$idx.wig"
