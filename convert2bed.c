@@ -3310,8 +3310,14 @@ static void
 c2b_delete_pipeset(c2b_pipeset_t *p)
 {
     size_t n;
+    size_t s;
 
     for (n = 0; n < p->num; n++) {
+        for (s = 0; s < PIPE_STREAMS; s++) {
+            close(p->in[n][s]);
+            close(p->out[n][s]);
+            close(p->err[n][s]);
+        }
         free(p->in[n]), p->in[n] = NULL;
         free(p->out[n]), p->out[n] = NULL;
         free(p->err[n]), p->err[n] = NULL;
