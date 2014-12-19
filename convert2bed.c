@@ -3734,6 +3734,7 @@ c2b_delete_globals()
     fprintf(stderr, "--- c2b_delete_globals() - enter ---\n");
 #endif
 
+    if (c2b_globals.output_format) free(c2b_globals.output_format), c2b_globals.output_format = NULL;
     if (c2b_globals.input_format) free(c2b_globals.input_format), c2b_globals.input_format = NULL;
     c2b_globals.input_format_idx = UNDEFINED_FORMAT;
     c2b_globals.all_reads_flag = kFalse;
