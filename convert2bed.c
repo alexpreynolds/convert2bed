@@ -701,10 +701,10 @@ c2b_cmd_cat_stdin(char *cmd)
     /* /path/to/cat - */
     memcpy(cmd,
            c2b_globals.cat->path,
-           strlen(c2b_globals.cat->path));
+           strlen(c2b_globals.cat->path) + 1);
     memcpy(cmd + strlen(c2b_globals.cat->path),
            cat_args,
-           strlen(cat_args));
+           strlen(cat_args) + 1);
     cmd[strlen(c2b_globals.cat->path) + strlen(cat_args)] = '\0';
 }
 
@@ -716,10 +716,10 @@ c2b_cmd_bam_to_sam(char *cmd)
     /* /path/to/samtools view -h - */
     memcpy(cmd, 
            c2b_globals.sam->samtools_path, 
-           strlen(c2b_globals.sam->samtools_path));
+           strlen(c2b_globals.sam->samtools_path) + 1);
     memcpy(cmd + strlen(c2b_globals.sam->samtools_path), 
            bam2sam_args, 
-           strlen(bam2sam_args));
+           strlen(bam2sam_args) + 1);
     cmd[strlen(c2b_globals.sam->samtools_path) + strlen(bam2sam_args)] = '\0';
 }
 
@@ -773,19 +773,19 @@ static inline void
 c2b_cmd_starch_bed(char *cmd) 
 {
     char starch_args[C2B_MAX_LINE_LENGTH_VALUE];
-    starch_args[0] = '\0';
+    memset(starch_args, 0, C2B_MAX_LINE_LENGTH_VALUE);
 
     /* /path/to/starch [--bzip2 | --gzip] [--note="xyz..."] - */
     if (c2b_globals.starch->bzip2) {
         memcpy(starch_args,
                starch_bzip2_arg,
-               strlen(starch_bzip2_arg));
+               strlen(starch_bzip2_arg) + 1);
         starch_args[strlen(starch_bzip2_arg)] = '\0';
     }
     else if (c2b_globals.starch->gzip) {
         memcpy(starch_args,
                starch_gzip_arg,
-               strlen(starch_gzip_arg));
+               strlen(starch_gzip_arg) + 1);
         starch_args[strlen(starch_gzip_arg)] = '\0';
     }
 
@@ -799,13 +799,13 @@ c2b_cmd_starch_bed(char *cmd)
     if (c2b_globals.starch->note) {
         memcpy(starch_args + strlen(starch_args),
                starch_note_prefix_arg,
-               strlen(starch_note_prefix_arg));
+               strlen(starch_note_prefix_arg) + 1);
         memcpy(starch_args + strlen(starch_args),
                c2b_globals.starch->note,
-               strlen(c2b_globals.starch->note));
+               strlen(c2b_globals.starch->note) + 1);
         memcpy(starch_args + strlen(starch_args),
                starch_note_suffix_arg,
-               strlen(starch_note_suffix_arg));
+               strlen(starch_note_suffix_arg) + 1);
         starch_args[strlen(starch_args) + strlen(starch_note_prefix_arg) + strlen(c2b_globals.starch->note) + strlen(starch_note_suffix_arg)] = '\0';
     }
     memcpy(starch_args + strlen(starch_args),
@@ -819,10 +819,10 @@ c2b_cmd_starch_bed(char *cmd)
     /* cmd */
     memcpy(cmd, 
            c2b_globals.starch->path, 
-           strlen(c2b_globals.starch->path));
+           strlen(c2b_globals.starch->path) + 1);
     memcpy(cmd + strlen(c2b_globals.starch->path), 
            starch_args, 
-           strlen(starch_args));
+           strlen(starch_args) + 1);
     cmd[strlen(c2b_globals.starch->path) + strlen(starch_args)] = '\0';
 }
 
@@ -3574,7 +3574,8 @@ c2b_print_matches(char *path, char *fn)
                     c2b_print_usage(stderr);
                     exit(ENOMEM); /* Not enough space (POSIX.1) */
                 }
-                memcpy(c2b_globals.sam->samtools_path, candidate, strlen(candidate) + 1);
+                memcpy(c2b_globals.sam->samtools_path, candidate, strlen(candidate));
+                c2b_globals.sam->samtools_path[strlen(candidate)] = '\0';
             }
             else if (strcmp(fn, c2b_sort_bed) == 0) {
                 c2b_globals.sort->sort_bed_path = malloc(strlen(candidate) + 1);
@@ -3583,7 +3584,8 @@ c2b_print_matches(char *path, char *fn)
                     c2b_print_usage(stderr);
                     exit(ENOMEM); /* Not enough space (POSIX.1) */
                 }
-                memcpy(c2b_globals.sort->sort_bed_path, candidate, strlen(candidate) + 1);
+                memcpy(c2b_globals.sort->sort_bed_path, candidate, strlen(candidate));
+                c2b_globals.sort->sort_bed_path[strlen(candidate)] = '\0';
             }
             else if (strcmp(fn, c2b_starch) == 0) {
                 c2b_globals.starch->path = malloc(strlen(candidate) + 1);
@@ -3592,7 +3594,8 @@ c2b_print_matches(char *path, char *fn)
                     c2b_print_usage(stderr);
                     exit(ENOMEM); /* Not enough space (POSIX.1) */
                 }
-                memcpy(c2b_globals.starch->path, candidate, strlen(candidate) + 1);
+                memcpy(c2b_globals.starch->path, candidate, strlen(candidate));
+                c2b_globals.starch->path[strlen(candidate)] = '\0';
             }
             else if (strcmp(fn, c2b_cat) == 0) {
                 c2b_globals.cat->path = malloc(strlen(candidate) + 1);
@@ -3600,7 +3603,8 @@ c2b_print_matches(char *path, char *fn)
                     fprintf(stderr, "Errrpr: Could not allocate space for storing cat path global\n");
                     exit(ENOMEM); /* Not enough space (POSIX.1) */
                 }
-                memcpy(c2b_globals.cat->path, candidate, strlen(candidate) + 1);
+                memcpy(c2b_globals.cat->path, candidate, strlen(candidate));
+                c2b_globals.cat->path[strlen(candidate)] = '\0';
             }
             break;
         }
