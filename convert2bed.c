@@ -3505,35 +3505,37 @@ c2b_test_dependencies()
         free(starch), starch = NULL;
     }
 
-    char *cat = NULL;
-    cat = malloc(strlen(c2b_cat) + 1);
-    if (!cat) {
-        fprintf(stderr, "Error: Cannot allocate space for cat variable copy\n");
-        c2b_print_usage(stderr);
-        exit(ENOMEM); /* Not enough space (POSIX.1) */
-    }
-    memcpy(cat, c2b_cat, strlen(c2b_cat) + 1);
-
-    char *path_cat = NULL;
-    path_cat = malloc(strlen(path) + 1);
-    if (!path_cat) {
-        fprintf(stderr, "Error: Cannot allocate space for path (cat) copy\n");
-        c2b_print_usage(stderr);
-        exit(ENOMEM); /* Not enough space (POSIX.1) */
-    }
-    memcpy(path_cat, path, strlen(path) + 1);
-
+    if (c2b_globals.input_format_idx != BAM_FORMAT) {
+        char *cat = NULL;
+        cat = malloc(strlen(c2b_cat) + 1);
+        if (!cat) {
+            fprintf(stderr, "Error: Cannot allocate space for cat variable copy\n");
+            c2b_print_usage(stderr);
+            exit(ENOMEM); /* Not enough space (POSIX.1) */
+        }
+        memcpy(cat, c2b_cat, strlen(c2b_cat) + 1);
+        
+        char *path_cat = NULL;
+        path_cat = malloc(strlen(path) + 1);
+        if (!path_cat) {
+            fprintf(stderr, "Error: Cannot allocate space for path (cat) copy\n");
+            c2b_print_usage(stderr);
+            exit(ENOMEM); /* Not enough space (POSIX.1) */
+        }
+        memcpy(path_cat, path, strlen(path) + 1);
+        
 #ifdef DEBUG
         fprintf(stderr, "Debug: Searching [%s] for cat\n", path_cat);
 #endif
-    
-    if (c2b_print_matches(path_cat, cat) != kTrue) {
-        fprintf(stderr, "Error: Cannot find cat binary required for piping IO\n");
-        c2b_print_usage(stderr);
-        exit(ENOENT); /* No such file or directory (POSIX.1) */
+        
+        if (c2b_print_matches(path_cat, cat) != kTrue) {
+            fprintf(stderr, "Error: Cannot find cat binary required for piping IO\n");
+            c2b_print_usage(stderr);
+            exit(ENOENT); /* No such file or directory (POSIX.1) */
+        }
+        free(path_cat), path_cat = NULL;
+        free(cat), cat = NULL;
     }
-    free(path_cat), path_cat = NULL;
-    free(cat), cat = NULL;
 
     free(path), path = NULL;
 
