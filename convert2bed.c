@@ -727,45 +727,45 @@ static inline void
 c2b_cmd_sort_bed(char *cmd)
 {
     char sort_bed_args[C2B_MAX_LINE_LENGTH_VALUE];
-    sort_bed_args[0] = '\0';
+    memset(sort_bed_args, 0, C2B_MAX_LINE_LENGTH_VALUE);
 
     /* /path/to/sort-bed [--max-mem <val>] [--tmpdir <path>] - */
     if (c2b_globals.sort->max_mem_value) {
         memcpy(sort_bed_args,
                sort_bed_max_mem_arg, 
-               strlen(sort_bed_max_mem_arg));
+               strlen(sort_bed_max_mem_arg) + 1);
         memcpy(sort_bed_args + strlen(sort_bed_args), 
                c2b_globals.sort->max_mem_value, 
-               strlen(c2b_globals.sort->max_mem_value));
+               strlen(c2b_globals.sort->max_mem_value) + 1);
         sort_bed_args[strlen(sort_bed_max_mem_arg) + strlen(sort_bed_args)] = '\0';
     }
     else {
         memcpy(sort_bed_args, 
                sort_bed_max_mem_default_arg, 
-               strlen(sort_bed_max_mem_default_arg));
+               strlen(sort_bed_max_mem_default_arg) + 1);
         sort_bed_args[strlen(sort_bed_max_mem_default_arg)] = '\0';
     }
     if (c2b_globals.sort->sort_tmpdir_path) {
         memcpy(sort_bed_args + strlen(sort_bed_args),
                sort_bed_tmpdir_arg,
-               strlen(sort_bed_tmpdir_arg));
+               strlen(sort_bed_tmpdir_arg) + 1);
         memcpy(sort_bed_args + strlen(sort_bed_args),
                c2b_globals.sort->sort_tmpdir_path,
-               strlen(c2b_globals.sort->sort_tmpdir_path));
+               strlen(c2b_globals.sort->sort_tmpdir_path) + 1);
         sort_bed_args[strlen(sort_bed_args) + strlen(c2b_globals.sort->sort_tmpdir_path)] = '\0';
     }
     memcpy(sort_bed_args + strlen(sort_bed_args),
            sort_bed_stdin,
-           strlen(sort_bed_stdin));
+           strlen(sort_bed_stdin) + 1);
     sort_bed_args[strlen(sort_bed_args) + strlen(sort_bed_stdin)] = '\0';
 
     /* cmd */
     memcpy(cmd, 
            c2b_globals.sort->sort_bed_path, 
-           strlen(c2b_globals.sort->sort_bed_path));
+           strlen(c2b_globals.sort->sort_bed_path) + 1);
     memcpy(cmd + strlen(c2b_globals.sort->sort_bed_path), 
            sort_bed_args, 
-           strlen(sort_bed_args));
+           strlen(sort_bed_args) + 1);
     cmd[strlen(c2b_globals.sort->sort_bed_path) + strlen(sort_bed_args)] = '\0';
 }
 
