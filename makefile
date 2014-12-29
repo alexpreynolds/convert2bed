@@ -1,7 +1,7 @@
 BLDFLAGS                  = -Wall -Wextra -pedantic -std=c99
 COMMONFLAGS               = -D__STDC_CONSTANT_MACROS -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE=1
 CFLAGS                    = -O3
-CDFLAGS                   = -DDEBUG=1 -g -O0 -fno-inline
+CDFLAGS                   = -v -DDEBUG=1 -g -O0 -fno-inline
 CPFLAGS                   = -pg
 LIBS                      = -lpthread
 INCLUDES                 := -iquote"${PWD}"
