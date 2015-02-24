@@ -51,7 +51,7 @@
 #include <sys/param.h>
 #include <sys/wait.h>
 
-#define C2B_VERSION "1.5"
+#define C2B_VERSION "1.7"
 
 typedef int boolean;
 extern const boolean kTrue;
