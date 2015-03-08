@@ -51,7 +51,7 @@
 #include <sys/param.h>
 #include <sys/wait.h>
 
-#define C2B_VERSION "1.7"
+#define C2B_VERSION "1.6"
 
 typedef int boolean;
 extern const boolean kTrue;
@@ -60,7 +60,7 @@ const boolean kTrue = 1;
 const boolean kFalse = 0;
 
 #define C2B_MAX_FIELD_COUNT_VALUE 64
-#define C2B_MAX_FIELD_LENGTH_VALUE 8192
+#define C2B_MAX_FIELD_LENGTH_VALUE 24576
 #define C2B_MAX_OPERATION_FIELD_LENGTH_VALUE 32
 #define C2B_MAX_STRAND_LENGTH_VALUE 4
 #define C2B_MAX_LINE_LENGTH_VALUE 131072
