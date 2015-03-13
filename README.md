@@ -1,8 +1,7 @@
 convert2bed
 ===========
 
-.. image:: https://travis-ci.org/alexpreynolds/convert2bed.svg?branch=master
-    :target: https://travis-ci.org/alexpreynolds/convert2bed
+[![Build Status](https://travis-ci.org/alexpreynolds/convert2bed.svg?branch=master)](https://travis-ci.org/alexpreynolds/convert2bed)
 
 The `convert2bed` tool converts common binary and text genomic formats ([BAM](http://samtools.github.io/hts-specs/SAMv1.pdf), [GFF](http://www.sequenceontology.org/gff3.shtml), [GTF](http://mblab.wustl.edu/GTF22.html), [GVF](http://www.sequenceontology.org/resources/gvf.html#summary), [PSL](http://genome.ucsc.edu/FAQ/FAQformat.html#format2), [RepeatMasker annotation output](http://www.repeatmasker.org/webrepeatmaskerhelp.html), [SAM](http://samtools.github.io/hts-specs/SAMv1.pdf), [VCF](http://samtools.github.io/hts-specs/VCFv4.2.pdf) and [WIG](http://genome.ucsc.edu/goldenpath/help/wiggle.html)) to unsorted or [sorted, extended BED](http://bedops.readthedocs.org/en/latest/content/reference/file-management/sorting/sort-bed.html) or [BEDOPS Starch](http://bedops.readthedocs.org/en/latest/content/reference/file-management/compression/starch.html) (compressed BED) with additional per-format options. 
 
