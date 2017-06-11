@@ -1,10 +1,10 @@
 convert2bed
 ===========
 
-Note!
------
+Note! Hey! Read this! This is really important!
+-----------------------------------------------
 
-Hi! At this time, all active development on `convert2bed` is being done within [BEDOPS](https://github.com/bedops/bedops). If you want the latest features and bug fixes in `convert2bed` (and there have been many since 2015), I strongly suggest you fork or review the code in BEDOPS.
+Hi! At this time, all active development on `convert2bed` is being done within [BEDOPS](https://github.com/bedops/bedops). If you want the latest features and bug fixes in `convert2bed` (and there have been many since 2015!), I very strongly suggest you fork or review the code in BEDOPS.
 
 [![Build Status](https://travis-ci.org/alexpreynolds/convert2bed.svg?branch=master)](https://travis-ci.org/alexpreynolds/convert2bed)
 
