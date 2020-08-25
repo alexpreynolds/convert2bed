@@ -8,9 +8,15 @@ Hi! At this time, all active development on `convert2bed` is being done within [
 
 [![Build Status](https://travis-ci.org/alexpreynolds/convert2bed.svg?branch=master)](https://travis-ci.org/alexpreynolds/convert2bed)
 
+Stop reading and go download BEDOPS! This code is dead!
+-------------------------------------------------------
+
 The `convert2bed` tool converts common binary and text genomic formats ([BAM](http://samtools.github.io/hts-specs/SAMv1.pdf), [GFF](http://www.sequenceontology.org/gff3.shtml), [GTF](http://mblab.wustl.edu/GTF22.html), [GVF](http://www.sequenceontology.org/resources/gvf.html#summary), [PSL](http://genome.ucsc.edu/FAQ/FAQformat.html#format2), [RepeatMasker annotation output](http://www.repeatmasker.org/webrepeatmaskerhelp.html), [SAM](http://samtools.github.io/hts-specs/SAMv1.pdf), [VCF](http://samtools.github.io/hts-specs/VCFv4.2.pdf) and [WIG](http://genome.ucsc.edu/goldenpath/help/wiggle.html)) to unsorted or [sorted, extended BED](http://bedops.readthedocs.org/en/latest/content/reference/file-management/sorting/sort-bed.html) or [BEDOPS Starch](http://bedops.readthedocs.org/en/latest/content/reference/file-management/compression/starch.html) (compressed BED) with additional per-format options. 
 
 Convenience wrapper `bash` scripts are provided for each format that convert standard input to unsorted or sorted BED, or to BEDOPS Starch (compressed BED). Scripts expose format-specific ``convert2bed`` options. 
+
+Why are you still reading this?! Please use BEDOPS!
+---------------------------------------------------
 
 We also provide ``bam2bed_sge``, ``bam2bed_gnuParallel``, ``bam2starch_sge`` and ``bam2starch_gnuParallel`` convenience scripts, which parallelize the conversion of indexed BAM to BED or to BEDOPS Starch via a [Sun Grid Engine](http://en.wikipedia.org/wiki/Oracle_Grid_Engine)-based computational cluster or local [GNU Parallel](http://en.wikipedia.org/wiki/GNU_parallel) installation.
 
